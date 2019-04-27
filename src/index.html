@@ -1,6 +1,12 @@
 <canvas width="1000" height="800"></canvas>
 
 <script>
+	const $ = document.querySelector.bind(document);
+	const c255 = (r, g, b) => `rgb(${r},${g},${b})`;
+	const cf = ({r, g, b}) => `rgb(${r * 255},${g * 255},${b * 255})`;
+	const cfu = (v) => `rgb(${v * 255},${v * 255},${v * 255})`;
+	const dist = (x, y, x2, y2) => Math.sqrt((x - x2) ** 2 + (y - y2) ** 2);
+
 	class CanvasPanel {
 		constructor(parentCanvas, x, y, width, height) {
 			this.canvas = document.createElement('canvas');
@@ -32,6 +38,12 @@
 				if (this.touch)
 					this.touchEnd();
 			});
+
+			this.init();
+		}
+
+		init() {
+			// override
 		}
 
 		readTouch(e) {
@@ -61,11 +73,14 @@
 	}
 
 	class DrawPanel extends CanvasPanel {
-		constructor(parentCanvas, x, y, width, height) {
-			super(parentCanvas, x, y, width, height);
+		init() {
 			this.n = 4;
 			this.touches = [];
 		}
+
+		setGetColorFunc(getColor) {
+			this.getColor = getColor
+		};
 
 		lastTouches(n) {
 			return this.touches.slice(this.touches.length - n);
@@ -83,10 +98,10 @@
 			let ts = this.lastTouches(this.n);
 
 			this.ctx.lineWidth = (ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length) ** 2;
-
 			this.ctx.beginPath();
 			this.ctx.moveTo(ts[0].x, ts[0].y);
 			this.ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
+			this.ctx.strokeStyle = this.getColor();
 			this.ctx.stroke();
 		}
 
@@ -96,23 +111,126 @@
 			let t = this.lastTouches(1)[0];
 
 			this.ctx.lineWidth = (t.w + t.h) ** 2;
-
+			this.ctx.strokeStyle = this.getColor();
 			this.ctx.strokeRect(t.x, t.y, t.w, t.h);
 		}
 	}
 
 	class ColorPanel extends CanvasPanel {
+		init() {
+			this.margin = 10;
+			this.size = Math.min(this.width, this.height) - this.margin * 2;
+			this.brightnessBarHeight = 60;
+			this.brightnessBarTop = this.size + this.margin * 2;
+			this.selectionSquareTop = this.brightnessBarTop + this.brightnessBarHeight + this.margin;
+
+			this.rx = Math.cos(0) + .5;
+			this.ry = Math.sin(0) + .5;
+			this.gx = Math.cos(Math.PI * 2 / 3) + .5;
+			this.gy = Math.sin(Math.PI * 2 / 3) + .5;
+			this.bx = Math.cos(Math.PI * 4 / 3) + .5;
+			this.by = Math.sin(Math.PI * 4 / 3) + .5;
+
+			this.brightness = .5;
+			this.circleX = this.circleY = .5;
+			this.color = this.colorAt();
+			this.paint();
+		}
+
+		touchStart(touch) {
+			this.pick(touch.x, touch.y);
+			this.paint();
+
+		}
+
+		touchMove(touch) {
+			this.pick(touch.x, touch.y);
+			this.paint();
+
+		}
+
+		colorAt(xf = this.circleX, yf = this.circleY) {
+			let radius = dist(xf, yf, .5, .5);
+
+			if (radius > .5)
+				return;
+
+			let r = 1 + this.brightness - dist(xf, yf, this.rx, this.ry);
+			let g = 1 + this.brightness - dist(xf, yf, this.gx, this.gy);
+			let b = 1 + this.brightness - dist(xf, yf, this.bx, this.by);
+			return {r, g, b};
+		}
+
+		pick(x, y) {
+			this.pickColor(x, y);
+			this.pickBrightness(x, y);
+			this.color = this.colorAt() || this.color;
+		}
+
+		pickColor(x, y) {
+			let xf = (x - this.margin) / this.size;
+			let yf = (y - this.margin) / this.size;
+			if (this.colorAt(xf, yf)) {
+				this.circleX = xf;
+				this.circleY = yf;
+			}
+		}
+
+		pickBrightness(x, y) {
+			let xf = (x - this.margin) / this.size;
+			let yf = (y - this.brightnessBarTop) / this.brightnessBarHeight;
+
+			if (xf > 0 && xf < 1 && yf > 0 && yf < 1)
+				this.brightness = xf;
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			this.paintCircle();
+			this.paintBar();
+			this.paintSquare();
+		}
+
+		paintCircle() {
+			for (let x = 0; x < this.size; x++)
+				for (let y = 0; y < this.size; y++) {
+					let xf = x / this.size, yf = y / this.size;
+					let c = this.colorAt(xf, yf);
+					if (Math.abs(xf - this.circleX) < .02 && Math.abs(yf - this.circleY) < .02) {
+						this.ctx.fillStyle = cfu(1);
+						this.ctx.fillRect(x + this.margin, y + this.margin, 1, 1);
+					} else if (c) {
+						this.ctx.fillStyle = cf(c);
+						this.ctx.fillRect(x + this.margin, y + this.margin, 1, 1);
+					}
+				}
+		}
+
+		paintBar() {
+			for (let x = 0; x < this.size; x++) {
+				let xf = x / this.size;
+
+				let selected = Math.abs(xf - this.brightness) < .02;
+
+				this.ctx.fillStyle = cfu(xf);
+				this.ctx.fillRect(x + this.margin, this.brightnessBarTop, 1, this.brightnessBarHeight - selected * .2 * this.brightnessBarHeight);
+			}
+			this.ctx.lineWidth = .5;
+			this.ctx.strokeRect(this.margin, this.brightnessBarTop, this.size, this.brightnessBarHeight);
+		}
+
+		paintSquare() {
+			this.ctx.fillStyle = cf(this.color);
+			this.ctx.fillRect(this.margin, this.selectionSquareTop, this.size, this.size);
+		}
 	}
-
-	const $ = document.querySelector.bind(document);
-
 	const canvas = $('canvas');
 	const ctx = canvas.getContext('2d');
 
-	let panels = [
-		new DrawPanel(canvas, 0, 0, 800, 800),
-		new ColorPanel(canvas, 800, 0, 200, 800),
-	];
+	let drawPanel = new DrawPanel(canvas, 0, 0, 800, 800);
+	let colorPanel = new ColorPanel(canvas, 800, 0, 200, 800);
+	drawPanel.setGetColorFunc(() => cf(colorPanel.color));
+	let panels = [drawPanel, colorPanel];
 
 	let outline = new Path2D();
 	outline.moveTo(panels[0].width, 0);
