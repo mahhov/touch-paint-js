@@ -1,0 +1,121 @@
+<style>
+	canvas {
+		outline: 1px solid black;
+	}
+</style>
+
+<canvas width="1000" height="800"></canvas>
+
+<script>
+	class CanvasPanel {
+		constructor(parentCanvas, x, y, width, height) {
+			this.canvas = document.createElement('canvas');
+			this.x = x;
+			this.y = y;
+			this.width = width;
+			this.height = height;
+			this.canvas.width = width;
+			this.canvas.height = height;
+			this.ctx = this.canvas.getContext('2d');
+
+			this.touch = false;
+			parentCanvas.addEventListener('touchstart', e => {
+				this.touch = this.readTouch(e);
+				if (this.touch)
+					this.touchStart(this.touch);
+			});
+			parentCanvas.addEventListener('touchmove', e => {
+				if (!this.touch)
+					return;
+
+				this.touch = this.readTouch(e);
+				if (this.touch)
+					this.touchMove(this.touch);
+				else
+					this.touchEnd();
+			});
+			parentCanvas.addEventListener('touchend', e => {
+				if (this.touch)
+					this.touchEnd();
+			});
+		}
+
+		readTouch(e) {
+			e.preventDefault(); // todo move
+			let {clientX: x, clientY: y, radiusX: w, radiusY: h} = e.touches[0];
+			x -= this.x;
+			y -= this.y;
+			if (x > 0 && x < this.width && y > 0 && y < this.height)
+				return {x, y, w, h};
+		}
+
+		touchStart(touch) {
+			// override
+		}
+
+		touchMove(touch) {
+			// override
+		}
+
+		touchEnd() {
+			// override
+		}
+
+		draw(ctx) {
+			ctx.drawImage(this.canvas, this.x, this.y);
+		}
+	}
+
+	class DrawPanel extends CanvasPanel {
+		constructor(parentCanvas, x, y, width, height) {
+			super(parentCanvas, x, y, width, height);
+			this.n = 4;
+			this.touches = [];
+		}
+
+		lastTouches(n) {
+			return this.touches.slice(this.touches.length - n);
+		}
+
+		touchStart(touch) {
+			this.touches = [touch];
+		}
+
+		touchMove(touch) {
+			this.touches.push(touch);
+
+			if (this.touches.length < this.n)
+				return;
+			let ts = this.lastTouches(this.n);
+
+			this.ctx.lineWidth = (ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length) ** 2;
+
+			this.ctx.beginPath();
+			this.ctx.moveTo(ts[0].x, ts[0].y);
+			this.ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
+			this.ctx.stroke();
+		}
+
+		touchEnd() {
+			if (this.touches.length >= this.n)
+				return;
+			let t = this.lastTouches(1)[0];
+
+			this.ctx.lineWidth = (t.w + t.h) ** 2;
+
+			this.ctx.strokeRect(t.x, t.y, t.w, t.h);
+		}
+	}
+
+	const $ = document.querySelector.bind(document);
+
+	const canvas = $('canvas');
+	const ctx = canvas.getContext('2d');
+	let drawPanel = new DrawPanel(canvas, 0, 0, 800, 800);
+
+	let render = () => {
+		drawPanel.draw(ctx);
+		requestAnimationFrame(render);
+	};
+	render();
+</script>
