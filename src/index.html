@@ -8,6 +8,66 @@
 	const dist = (x, y, x2, y2) => Math.sqrt((x - x2) ** 2 + (y - y2) ** 2);
 	const scale = (v, min, max) => Math.min(Math.max((v - min) / (max - min), 0), 1);
 
+	class Curves {
+		constructor(width, height) {
+			this.width = width;
+			this.height = height;
+			this.n = 4;
+			this.layers = [];
+			this.layer = 0;
+			this.pressure = new Average(.3);
+		}
+
+		newLayer() {
+			let canvas = document.createElement('canvas');
+			canvas.width = this.width;
+			canvas.height = this.height;
+			let ctx = canvas.getContext('2d');
+
+			return {
+				canvas,
+				ctx,
+				curves: [],
+			};
+		}
+
+		setColor(color) {
+			this.color = color;
+		}
+
+		setLayer(layer) {
+			this.layer = layer;
+		}
+
+		beginCurve() {
+			this.layers[this.layer] = this.layers[this.layer] || this.newLayer();
+			this.curve = {color: this.color, touches: []};
+			this.pressure.reset();
+			this.layers[this.layer].curves.push(this.curve);
+		}
+
+		continueCurve(touch) {
+			this.curve.touches.push(touch);
+
+			if (this.curve.touches.length < this.n)
+				return;
+			let ts = this.curve.touches.slice(this.curve.touches.length - this.n);
+
+			let pressure = ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length;
+			let avgPressure = this.pressure.addValue(pressure);
+			let scaledPressure = scale(avgPressure, 2, 3);
+			let width = scaledPressure ** 2 * 10 + 1;
+
+			let ctx = this.layers[this.layer].ctx;
+			ctx.lineWidth = width;
+			ctx.beginPath();
+			ctx.moveTo(ts[0].x, ts[0].y);
+			ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
+			ctx.strokeStyle = cf(this.curve.color);
+			ctx.stroke();
+		}
+	}
+
 	class Average {
 		constructor(newWeight) {
 			this.newWeight = newWeight;
@@ -89,53 +149,24 @@
 	}
 
 	class DrawPanel extends CanvasPanel {
-		init() {
-			this.n = 4;
-			this.touches = [];
-			this.pressure = new Average(.3);
-		}
-
-		setGetColorFunc(getColor) {
-			this.getColor = getColor
-		};
-
 		lastTouches(n) {
 			return this.touches.slice(this.touches.length - n);
 		}
 
 		touchStart(touch) {
-			this.touches = [touch];
-			this.pressure.reset();
+			curves.beginCurve();
+			curves.continueCurve(touch);
+			this.paint();
 		}
 
 		touchMove(touch) {
-			this.touches.push(touch);
-
-			if (this.touches.length < this.n)
-				return;
-			let ts = this.lastTouches(this.n);
-
-			let pressure = ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length;
-			let avgPressure = this.pressure.addValue(pressure);
-			let scaledPressure = scale(avgPressure, 2, 3);
-			let width = scaledPressure ** 2 * 10 + 1;
-
-			this.ctx.lineWidth = width;
-			this.ctx.beginPath();
-			this.ctx.moveTo(ts[0].x, ts[0].y);
-			this.ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
-			this.ctx.strokeStyle = this.getColor();
-			this.ctx.stroke();
+			curves.continueCurve(touch);
+			this.paint();
 		}
 
-		touchEnd() {
-			if (this.touches.length >= this.n)
-				return;
-			let t = this.lastTouches(1)[0];
-
-			this.ctx.lineWidth = (t.w + t.h) ** 2;
-			this.ctx.strokeStyle = this.getColor();
-			this.ctx.strokeRect(t.x, t.y, t.w, t.h);
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			curves.layers.forEach(({canvas}) => this.ctx.drawImage(canvas, 0, 0));
 		}
 	}
 
@@ -156,7 +187,7 @@
 
 			this.brightness = .5;
 			this.circleX = this.circleY = .5;
-			this.color = this.colorAt();
+			this.setColor(this.colorAt());
 			this.paint();
 		}
 
@@ -184,10 +215,15 @@
 			return {r, g, b};
 		}
 
+		setColor(color) {
+			this.color = color;
+			curves.setColor(color);
+		}
+
 		pick(x, y) {
 			this.pickColor(x, y);
 			this.pickBrightness(x, y);
-			this.color = this.colorAt() || this.color;
+			this.setColor(this.colorAt() || this.color);
 		}
 
 		pickColor(x, y) {
@@ -287,10 +323,11 @@
 	const canvas = $('canvas');
 	const ctx = canvas.getContext('2d');
 
+	let curves = new Curves(800, 800);
+
 	let drawPanel = new DrawPanel(canvas, 0, 0, 800, 800);
 	let colorPanel = new ColorPanel(canvas, 800, 0, 200, 340);
 	let layerPanel = new LayerPanel(canvas, 800, 340, 200, 800 - 340);
-	drawPanel.setGetColorFunc(() => cf(colorPanel.color));
 	let panels = [drawPanel, colorPanel, layerPanel];
 
 	let outline = new Path2D();
@@ -317,4 +354,5 @@
 	// undo/redo
 	// save
 	// line width, brush style
+	// touch tap to draw small rect
 </script>
