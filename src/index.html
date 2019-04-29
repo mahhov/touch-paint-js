@@ -117,8 +117,8 @@
 
 			let pressure = ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length;
 			let avgPressure = this.pressure.addValue(pressure);
-			let scaledPressure = scale(avgPressure, 1, 3);
-			let width = scaledPressure ** 2 * 20 + 1;
+			let scaledPressure = scale(avgPressure, 2, 3);
+			let width = scaledPressure ** 2 * 10 + 1;
 
 			this.ctx.lineWidth = width;
 			this.ctx.beginPath();
