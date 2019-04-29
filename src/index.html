@@ -14,7 +14,6 @@
 			this.height = height;
 			this.n = 4;
 			this.layers = [];
-			this.layer = 0;
 			this.pressure = new Average(.3);
 		}
 
@@ -292,8 +291,13 @@
 			this.deltaY = this.barHeight + this.margin;
 
 			this.layerCount = 5;
-			this.selected = 0;
+			this.setLayer(0);
 			this.paint();
+		}
+
+		setLayer(layer) {
+			this.layer = layer;
+			curves.setLayer(layer);
 		}
 
 		touchStart(touch) {
@@ -306,14 +310,14 @@
 			let xf = (x - this.margin) / this.barWidth;
 			let yf = (y - this.margin) / this.deltaY;
 			if (xf > 0 && xf < 1 && yf > 0 && yf % 1 < this.barHeight / this.deltaY && yf < this.layerCount)
-				this.selected = yf - yf % 1;
+				this.setLayer(yf - yf % 1);
 		}
 
 		paint() {
 			this.ctx.clearRect(0, 0, this.width, this.height);
 			this.ctx.fillStyle = cfu(.9);
 			for (let i = 0; i < this.layerCount; i++) {
-				if (i === this.selected)
+				if (i === this.layer)
 					this.ctx.fillRect(this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
 				this.ctx.strokeRect(this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
 			}
@@ -348,7 +352,6 @@
 
 	// todo
 	// each panel responsible for outlines
-	// layers
 	// recent colors
 	// color transparency
 	// undo/redo
