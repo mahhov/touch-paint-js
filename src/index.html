@@ -6,6 +6,22 @@
 	const cf = ({r, g, b}) => `rgb(${r * 255},${g * 255},${b * 255})`;
 	const cfu = (v) => `rgb(${v * 255},${v * 255},${v * 255})`;
 	const dist = (x, y, x2, y2) => Math.sqrt((x - x2) ** 2 + (y - y2) ** 2);
+	const scale = (v, min, max) => Math.min(Math.max((v - min) / (max - min), 0), 1);
+
+	class Average {
+		constructor(newWeight) {
+			this.newWeight = newWeight;
+		}
+
+		reset() {
+			this.value = null;
+		}
+
+		addValue(value) {
+			this.value = (this.value || value) * (1 - this.newWeight) + value * this.newWeight;
+			return this.value;
+		}
+	}
 
 	class CanvasPanel {
 		constructor(parentCanvas, x, y, width, height) {
@@ -76,6 +92,7 @@
 		init() {
 			this.n = 4;
 			this.touches = [];
+			this.pressure = new Average(.3);
 		}
 
 		setGetColorFunc(getColor) {
@@ -88,6 +105,7 @@
 
 		touchStart(touch) {
 			this.touches = [touch];
+			this.pressure.reset();
 		}
 
 		touchMove(touch) {
@@ -97,7 +115,12 @@
 				return;
 			let ts = this.lastTouches(this.n);
 
-			this.ctx.lineWidth = (ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length) ** 2;
+			let pressure = ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length;
+			let avgPressure = this.pressure.addValue(pressure);
+			let scaledPressure = scale(avgPressure, 1, 3);
+			let width = scaledPressure ** 2 * 20 + 1;
+
+			this.ctx.lineWidth = width;
 			this.ctx.beginPath();
 			this.ctx.moveTo(ts[0].x, ts[0].y);
 			this.ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
