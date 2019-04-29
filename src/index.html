@@ -244,20 +244,60 @@
 
 		paintSquare() {
 			this.ctx.fillStyle = cf(this.color);
-			this.ctx.fillRect(this.margin, this.selectionSquareTop, this.size, this.size);
+			this.ctx.fillRect(this.margin + this.size / 3, this.selectionSquareTop, this.size / 3, this.size / 3);
 		}
 	}
+
+	class LayerPanel extends CanvasPanel {
+		init() {
+			this.margin = 10;
+			this.barWidth = this.width - this.margin * 2;
+			this.barHeight = 60;
+			this.deltaY = this.barHeight + this.margin;
+
+			this.layerCount = 5;
+			this.selected = 0;
+			this.paint();
+		}
+
+		touchStart(touch) {
+			this.pick(touch.x, touch.y);
+			this.paint();
+
+		}
+
+		pick(x, y) {
+			let xf = (x - this.margin) / this.barWidth;
+			let yf = (y - this.margin) / this.deltaY;
+			if (xf > 0 && xf < 1 && yf > 0 && yf % 1 < this.barHeight / this.deltaY && yf < this.layerCount)
+				this.selected = yf - yf % 1;
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			this.ctx.fillStyle = cfu(.9);
+			for (let i = 0; i < this.layerCount; i++) {
+				if (i === this.selected)
+					this.ctx.fillRect(this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
+				this.ctx.strokeRect(this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
+			}
+		}
+	}
+
 	const canvas = $('canvas');
 	const ctx = canvas.getContext('2d');
 
 	let drawPanel = new DrawPanel(canvas, 0, 0, 800, 800);
-	let colorPanel = new ColorPanel(canvas, 800, 0, 200, 800);
+	let colorPanel = new ColorPanel(canvas, 800, 0, 200, 340);
+	let layerPanel = new LayerPanel(canvas, 800, 340, 200, 800 - 340);
 	drawPanel.setGetColorFunc(() => cf(colorPanel.color));
-	let panels = [drawPanel, colorPanel];
+	let panels = [drawPanel, colorPanel, layerPanel];
 
 	let outline = new Path2D();
 	outline.moveTo(panels[0].width, 0);
 	outline.lineTo(panels[0].width, canvas.height);
+	outline.moveTo(panels[1].x, panels[1].height);
+	outline.lineTo(panels[1].x + panels[1].width, panels[1].height);
 	outline.rect(1, 1, canvas.width - 2, canvas.height - 2);
 
 	let render = () => {
@@ -270,6 +310,7 @@
 	render();
 
 	// todo
+	// each panel responsible for outlines
 	// layers
 	// recent colors
 	// color transparency
