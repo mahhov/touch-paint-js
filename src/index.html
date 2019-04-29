@@ -145,6 +145,14 @@
 		draw(ctx) {
 			ctx.drawImage(this.canvas, this.x, this.y);
 		}
+
+		addOutline(outlinePath) {
+			let x = this.x || 1;
+			let y = this.y || 1;
+			let w = this.width - !this.x - (this.x + this.width === canvas.width);
+			let h = this.height - !this.y - (this.y + this.height === canvas.height);
+			outlinePath.rect(x, y, w, h);
+		}
 	}
 
 	class DrawPanel extends CanvasPanel {
@@ -335,23 +343,19 @@
 	let panels = [drawPanel, colorPanel, layerPanel];
 
 	let outline = new Path2D();
-	outline.moveTo(panels[0].width, 0);
-	outline.lineTo(panels[0].width, canvas.height);
-	outline.moveTo(panels[1].x, panels[1].height);
-	outline.lineTo(panels[1].x + panels[1].width, panels[1].height);
+	panels.forEach(panel => panel.addOutline(outline));
 	outline.rect(1, 1, canvas.width - 2, canvas.height - 2);
 
 	let render = () => {
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		panels.forEach(panel => panel.draw(ctx));
-		ctx.lineWidth = .7;
+		ctx.lineWidth = .3;
 		ctx.stroke(outline);
 		requestAnimationFrame(render);
 	};
 	render();
 
 	// todo
-	// each panel responsible for outlines
 	// recent colors
 	// color transparency
 	// undo/redo
