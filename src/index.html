@@ -350,15 +350,7 @@
 		}
 
 		paintAlpha() {
-			let square = this.barHeight / 4;
-			for (let x = 0; x < this.size / square; x++)
-				for (let y = 0; y < this.barHeight / square; y++) {
-					let black = (x + y) % 2;
-					this.ctx.fillStyle = black ? cfu(0) : cfu(1);
-					let width = Math.min(square, this.size - x * square);
-					let height = Math.min(square, this.barHeight - y * square);
-					this.ctx.fillRect(x * square + this.margin, y * square + this.alphaBarTop, width, height);
-				}
+			this.paintCheckBackground(this.margin, this.alphaBarTop, this.size, this.barHeight);
 
 			for (let x = 0; x < this.size; x++) {
 				let xf = x / this.size;
@@ -370,21 +362,40 @@
 			this.paintBarSelectionAndOutline(this.alphaBarTop, this.alpha);
 		}
 
+		paintPreview() {
+			const SIZE = this.size / 3;
+			let left = this.margin + SIZE;
+
+			this.paintCheckBackground(left, this.selectionSquareTop, SIZE, SIZE);
+
+			this.ctx.fillStyle = cf(this.color);
+			this.ctx.fillRect(left, this.selectionSquareTop, SIZE, SIZE);
+
+			this.ctx.strokeStyle = cfu(.5);
+			this.ctx.strokeRect(left, this.selectionSquareTop, SIZE, SIZE);
+		}
+
 		paintBarSelectionAndOutline(barTop, selection) {
 			let selectionLeft = Math.max(selection - .02, 0);
 			let selectionWidth = Math.min(selection + .02, 1) - selectionLeft;
 			this.ctx.fillStyle = cfu(1);
 			this.ctx.fillRect(selectionLeft * this.size + this.margin, barTop, selectionWidth * this.size, this.barHeight);
-			this.ctx.lineWidth = 1;
 			this.ctx.strokeStyle = cfu(.5);
 			this.ctx.strokeRect(selectionLeft * this.size + this.margin, barTop, selectionWidth * this.size, this.barHeight);
 
 			this.ctx.strokeRect(this.margin, barTop, this.size, this.barHeight);
 		}
 
-		paintPreview() {
-			this.ctx.fillStyle = cf(this.color);
-			this.ctx.fillRect(this.margin + this.size / 3, this.selectionSquareTop, this.size / 3, this.size / 3);
+		paintCheckBackground(left, top, width, height) {
+			const square = 10;
+			for (let x = 0; x < width / square; x++)
+				for (let y = 0; y < height / square; y++) {
+					let black = (x + y) % 2;
+					this.ctx.fillStyle = black ? cfu(0) : cfu(1);
+					let w = Math.min(square, width - x * square);
+					let h = Math.min(square, height - y * square);
+					this.ctx.fillRect(x * square + left, y * square + top, w, h);
+				}
 		}
 	}
 
@@ -458,7 +469,6 @@
 	render();
 
 	// todo
-	// alpha preview in square
 	// recent colors
 	// undo/redo
 	// save
