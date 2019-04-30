@@ -2,9 +2,8 @@
 
 <script>
 	const $ = document.querySelector.bind(document);
-	const c255 = (r, g, b) => `rgb(${r},${g},${b})`;
-	const cf = ({r, g, b}) => `rgb(${r * 255},${g * 255},${b * 255})`;
-	const cfu = (v) => `rgb(${v * 255},${v * 255},${v * 255})`;
+	const cf = ({r, g, b, a = 1}) => `rgba(${r * 255}, ${g * 255}, ${b * 255}, ${a})`;
+	const cfu = (v, a = 1) => `rgba(${v * 255}, ${v * 255}, ${v * 255}, ${a})`;
 	const dist = (x, y, x2, y2) => Math.sqrt((x - x2) ** 2 + (y - y2) ** 2);
 	const scale = (v, min, max) => Math.min(Math.max((v - min) / (max - min), 0), 1);
 
@@ -227,9 +226,10 @@
 		init() {
 			this.margin = 10;
 			this.size = Math.min(this.width, this.height) - this.margin * 2;
-			this.brightnessBarHeight = 60;
+			this.barHeight = 40;
 			this.brightnessBarTop = this.size + this.margin * 2;
-			this.selectionSquareTop = this.brightnessBarTop + this.brightnessBarHeight + this.margin;
+			this.alphaBarTop = this.brightnessBarTop + this.barHeight + this.margin;
+			this.selectionSquareTop = this.alphaBarTop + this.barHeight + this.margin;
 
 			this.rx = Math.cos(0) + .5;
 			this.ry = Math.sin(0) + .5;
@@ -239,6 +239,7 @@
 			this.by = Math.sin(Math.PI * 4 / 3) + .5;
 
 			this.brightness = .5;
+			this.alpha = 1;
 			this.circleX = this.circleY = .5;
 			this.setColor(this.colorAt());
 			this.paint();
@@ -265,7 +266,7 @@
 			let r = 1 + this.brightness - dist(xf, yf, this.rx, this.ry);
 			let g = 1 + this.brightness - dist(xf, yf, this.gx, this.gy);
 			let b = 1 + this.brightness - dist(xf, yf, this.bx, this.by);
-			return {r, g, b};
+			return {r, g, b, a: this.alpha};
 		}
 
 		setColor(color) {
@@ -276,6 +277,7 @@
 		pick(x, y) {
 			this.pickColor(x, y);
 			this.pickBrightness(x, y);
+			this.pickAlpha(x, y);
 			this.setColor(this.colorAt() || this.color);
 		}
 
@@ -290,48 +292,80 @@
 
 		pickBrightness(x, y) {
 			let xf = (x - this.margin) / this.size;
-			let yf = (y - this.brightnessBarTop) / this.brightnessBarHeight;
+			let yf = (y - this.brightnessBarTop) / this.barHeight;
 
 			if (xf > 0 && xf < 1 && yf > 0 && yf < 1)
 				this.brightness = xf;
 		}
 
-		paint() {
-			this.ctx.clearRect(0, 0, this.width, this.height);
-			this.paintCircle();
-			this.paintBar();
-			this.paintSquare();
+		pickAlpha(x, y) {
+			let xf = (x - this.margin) / this.size;
+			let yf = (y - this.alphaBarTop) / this.barHeight;
+
+			if (xf > 0 && xf < 1 && yf > 0 && yf < 1)
+				this.alpha = xf;
 		}
 
-		paintCircle() {
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			this.paintColor();
+			this.paintBrightness();
+			this.paintAlpha();
+			this.paintPreview();
+		}
+
+		paintColor() {
 			for (let x = 0; x < this.size; x++)
 				for (let y = 0; y < this.size; y++) {
 					let xf = x / this.size, yf = y / this.size;
 					let c = this.colorAt(xf, yf);
-					if (Math.abs(xf - this.circleX) < .02 && Math.abs(yf - this.circleY) < .02) {
-						this.ctx.fillStyle = cfu(1);
-						this.ctx.fillRect(x + this.margin, y + this.margin, 1, 1);
-					} else if (c) {
-						this.ctx.fillStyle = cf(c);
-						this.ctx.fillRect(x + this.margin, y + this.margin, 1, 1);
-					}
+					if (!c)
+						continue;
+					let selected = Math.abs(xf - this.circleX) < .02 && Math.abs(yf - this.circleY) < .02;
+					this.ctx.fillStyle = selected ? cfu(1) : cf(c);
+					this.ctx.fillRect(x + this.margin, y + this.margin, 1, 1);
 				}
 		}
 
-		paintBar() {
+		paintBrightness() {
 			for (let x = 0; x < this.size; x++) {
 				let xf = x / this.size;
 
 				let selected = Math.abs(xf - this.brightness) < .02;
 
 				this.ctx.fillStyle = cfu(xf);
-				this.ctx.fillRect(x + this.margin, this.brightnessBarTop, 1, this.brightnessBarHeight - selected * .2 * this.brightnessBarHeight);
+				this.ctx.fillRect(x + this.margin, this.brightnessBarTop, 1, this.barHeight - selected * .2 * this.barHeight);
 			}
 			this.ctx.lineWidth = .5;
-			this.ctx.strokeRect(this.margin, this.brightnessBarTop, this.size, this.brightnessBarHeight);
+			this.ctx.strokeRect(this.margin, this.brightnessBarTop, this.size, this.barHeight);
 		}
 
-		paintSquare() {
+		paintAlpha() {
+			let square = this.barHeight / 4;
+			for (let x = 0; x < this.size / square; x++)
+				for (let y = 0; y < this.barHeight / square; y++) {
+					let black = (x + y) % 2;
+					this.ctx.fillStyle = black ? cfu(0) : cfu(1);
+					let width = Math.min(square, this.size - x * square);
+					let height = Math.min(square, this.barHeight - y * square);
+					this.ctx.fillRect(x * square + this.margin, y * square + this.alphaBarTop, width, height);
+				}
+
+			for (let x = 0; x < this.size; x++) {
+				let xf = x / this.size;
+
+				let selected = Math.abs(xf - this.alpha) < .02;
+
+				this.ctx.fillStyle = cfu(0, xf);
+				this.ctx.fillRect(x + this.margin, this.alphaBarTop, 1, this.barHeight - selected * .2 * this.barHeight);
+			}
+
+			this.ctx.lineWidth = .5;
+			this.ctx.strokeRect(this.margin, this.alphaBarTop, this.size, this.barHeight);
+
+		}
+
+		paintPreview() {
 			this.ctx.fillStyle = cf(this.color);
 			this.ctx.fillRect(this.margin + this.size / 3, this.selectionSquareTop, this.size / 3, this.size / 3);
 		}
@@ -384,8 +418,8 @@
 	let curves = new Curves(800, 800);
 
 	let drawPanel = new DrawPanel(canvas, 0, 0, 800, 800);
-	let colorPanel = new ColorPanel(canvas, 800, 0, 200, 340);
-	let layerPanel = new LayerPanel(canvas, 800, 340, 200, 800 - 340);
+	let colorPanel = new ColorPanel(canvas, 800, 0, 200, 410);
+	let layerPanel = new LayerPanel(canvas, 800, 410, 200, 800 - 410);
 	let panels = [drawPanel, colorPanel, layerPanel];
 
 	let outline = new Path2D();
