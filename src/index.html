@@ -331,13 +331,11 @@
 			for (let x = 0; x < this.size; x++) {
 				let xf = x / this.size;
 
-				let selected = Math.abs(xf - this.brightness) < .02;
-
 				this.ctx.fillStyle = cfu(xf);
-				this.ctx.fillRect(x + this.margin, this.brightnessBarTop, 1, this.barHeight - selected * .2 * this.barHeight);
+				this.ctx.fillRect(x + this.margin, this.brightnessBarTop, 1, this.barHeight);
 			}
-			this.ctx.lineWidth = .5;
-			this.ctx.strokeRect(this.margin, this.brightnessBarTop, this.size, this.barHeight);
+
+			this.paintBarSelectionAndOutline(this.brightnessBarTop, this.brightness);
 		}
 
 		paintAlpha() {
@@ -354,15 +352,23 @@
 			for (let x = 0; x < this.size; x++) {
 				let xf = x / this.size;
 
-				let selected = Math.abs(xf - this.alpha) < .02;
-
 				this.ctx.fillStyle = cfu(0, xf);
-				this.ctx.fillRect(x + this.margin, this.alphaBarTop, 1, this.barHeight - selected * .2 * this.barHeight);
+				this.ctx.fillRect(x + this.margin, this.alphaBarTop, 1, this.barHeight);
 			}
 
-			this.ctx.lineWidth = .5;
-			this.ctx.strokeRect(this.margin, this.alphaBarTop, this.size, this.barHeight);
+			this.paintBarSelectionAndOutline(this.alphaBarTop, this.alpha);
+		}
 
+		paintBarSelectionAndOutline(barTop, selection) {
+			let selectionLeft = Math.max(selection - .02, 0);
+			let selectionWidth = Math.min(selection + .02, 1) - selectionLeft;
+			this.ctx.fillStyle = cfu(1);
+			this.ctx.fillRect(selectionLeft * this.size + this.margin, barTop, selectionWidth * this.size, this.barHeight);
+			this.ctx.lineWidth = 1;
+			this.ctx.strokeStyle = cfu(.5);
+			this.ctx.strokeRect(selectionLeft * this.size + this.margin, barTop, selectionWidth * this.size, this.barHeight);
+
+			this.ctx.strokeRect(this.margin, barTop, this.size, this.barHeight);
 		}
 
 		paintPreview() {
@@ -436,6 +442,10 @@
 	render();
 
 	// todo
+	// mouse coordinates off a bit
+	// alpha selection rect distorted
+	// alpha preview in square
+	// layer preview
 	// recent colors
 	// color transparency
 	// undo/redo
