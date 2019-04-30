@@ -168,19 +168,19 @@
 		}
 
 		readTouch(e) {
-			e.preventDefault(); // todo move
+			e.preventDefault();
 			let {clientX: x, clientY: y, radiusX: w, radiusY: h} = e.touches[0];
-			x -= this.x;
-			y -= this.y;
+			x -= this.x + e.srcElement.offsetLeft;
+			y -= this.y + e.srcElement.offsetTop;
 			if (x > 0 && x < this.width && y > 0 && y < this.height)
 				return {x, y, w, h};
 		}
 
 		readMouse(e) {
-			e.preventDefault(); // todo move
+			e.preventDefault();
 			let {clientX: x, clientY: y, altKey, ctrlKey, shiftKey} = e;
-			x -= this.x;
-			y -= this.y;
+			x -= this.x + e.srcElement.offsetLeft;
+			y -= this.y + e.srcElement.offsetTop;
 			let fakeSize = 2 + (altKey + ctrlKey + shiftKey) / 3;
 			if (x > 0 && x < this.width && y > 0 && y < this.height)
 				return {x, y, w: fakeSize, h: 0};
@@ -458,12 +458,8 @@
 	render();
 
 	// todo
-	// mouse coordinates off a bit
-	// alpha selection rect distorted
 	// alpha preview in square
-	// layer preview
 	// recent colors
-	// color transparency
 	// undo/redo
 	// save
 	// line width, brush style
