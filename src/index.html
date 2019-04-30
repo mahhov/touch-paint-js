@@ -93,12 +93,21 @@
 			this.canvas.height = height;
 			this.ctx = this.canvas.getContext('2d');
 
+			this.addTouchListeners(parentCanvas);
+			this.addMouseListeners(parentCanvas);
+
+			this.init();
+		}
+
+		addTouchListeners(parentCanvas) {
 			this.touch = false;
+
 			parentCanvas.addEventListener('touchstart', e => {
 				this.touch = this.readTouch(e);
 				if (this.touch)
 					this.touchStart(this.touch);
 			});
+
 			parentCanvas.addEventListener('touchmove', e => {
 				if (!this.touch)
 					return;
@@ -109,12 +118,39 @@
 				else
 					this.touchEnd();
 			});
+
 			parentCanvas.addEventListener('touchend', e => {
 				if (this.touch)
 					this.touchEnd();
+				this.touch = null;
+			});
+		}
+
+		addMouseListeners(parentCanvas) {
+			this.mouseDown = false;
+
+			parentCanvas.addEventListener('mousedown', e => {
+				this.mouseDown = this.readMouse(e);
+				if (this.mouseDown)
+					this.touchStart(this.mouseDown);
 			});
 
-			this.init();
+			parentCanvas.addEventListener('mousemove', e => {
+				if (!this.mouseDown)
+					return;
+
+				this.mouseDown = this.readMouse(e);
+				if (this.mouseDown)
+					this.touchMove(this.mouseDown);
+				else
+					this.touchEnd();
+			});
+
+			parentCanvas.addEventListener('mouseup', e => {
+				if (this.mouseDown)
+					this.touchEnd();
+				this.mouseDown = null;
+			});
 		}
 
 		init() {
@@ -128,6 +164,16 @@
 			y -= this.y;
 			if (x > 0 && x < this.width && y > 0 && y < this.height)
 				return {x, y, w, h};
+		}
+
+		readMouse(e) {
+			e.preventDefault(); // todo move
+			let {clientX: x, clientY: y, altKey, ctrlKey, shiftKey} = e;
+			x -= this.x;
+			y -= this.y;
+			let fakeSize = 2 + (altKey + ctrlKey + shiftKey) / 3;
+			if (x > 0 && x < this.width && y > 0 && y < this.height)
+				return {x, y, w: fakeSize, h: 0};
 		}
 
 		touchStart(touch) {
