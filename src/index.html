@@ -1,4 +1,4 @@
-<canvas width="1000" height="800"></canvas>
+<canvas width="1200" height="800"></canvas>
 
 <script>
 	const $ = document.querySelector.bind(document);
@@ -14,6 +14,7 @@
 			this.n = 4;
 			this.layers = [];
 			this.pressure = new Average(.3);
+			this.listeners = [];
 		}
 
 		newLayer() {
@@ -63,6 +64,16 @@
 			ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
 			ctx.strokeStyle = cf(this.curve.color);
 			ctx.stroke();
+
+			this.listeners.forEach(listener => listener());
+		}
+
+		addListener(listener) {
+			this.listeners.push(listener);
+		}
+
+		getLayerCanvas(layer) {
+			return this.layers[layer] && this.layers[layer].canvas;
 		}
 	}
 
@@ -381,12 +392,14 @@
 		init() {
 			this.margin = 10;
 			this.barWidth = this.width - this.margin * 2;
-			this.barHeight = 60;
+			this.barHeight = this.barWidth;
 			this.deltaY = this.barHeight + this.margin;
 
 			this.layerCount = 5;
 			this.setLayer(0);
 			this.paint();
+
+			curves.addListener(() => this.paint());
 		}
 
 		setLayer(layer) {
@@ -409,10 +422,13 @@
 
 		paint() {
 			this.ctx.clearRect(0, 0, this.width, this.height);
-			this.ctx.fillStyle = cfu(.9);
 			for (let i = 0; i < this.layerCount; i++) {
 				if (i === this.layer)
-					this.ctx.fillRect(this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
+					this.ctx.strokeStyle = cfu(0);
+				else
+					this.ctx.strokeStyle = cfu(.6);
+				if (curves.getLayerCanvas(i))
+					this.ctx.drawImage(curves.getLayerCanvas(i), this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
 				this.ctx.strokeRect(this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
 			}
 		}
@@ -424,8 +440,8 @@
 	let curves = new Curves(800, 800);
 
 	let drawPanel = new DrawPanel(canvas, 0, 0, 800, 800);
-	let colorPanel = new ColorPanel(canvas, 800, 0, 200, 410);
-	let layerPanel = new LayerPanel(canvas, 800, 410, 200, 800 - 410);
+	let colorPanel = new ColorPanel(canvas, 800, 0, 200, 800);
+	let layerPanel = new LayerPanel(canvas, 1000, 0, 100, 800);
 	let panels = [drawPanel, colorPanel, layerPanel];
 
 	let outline = new Path2D();
