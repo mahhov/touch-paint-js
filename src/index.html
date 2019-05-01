@@ -6,6 +6,9 @@
 	const cfu = (v, a = 1) => `rgba(${v * 255}, ${v * 255}, ${v * 255}, ${a})`;
 	const dist = (x, y, x2, y2) => Math.sqrt((x - x2) ** 2 + (y - y2) ** 2);
 	const scale = (v, min, max) => Math.min(Math.max((v - min) / (max - min), 0), 1);
+	const fontHeight = ctx => ctx.measureText('M').width * .99;
+
+	const LAYER_COUNT = 5;
 
 	class Curves {
 		constructor(width, height) {
@@ -66,6 +69,10 @@
 			ctx.stroke();
 
 			this.listeners.forEach(listener => listener());
+		}
+
+		undo(layer, undo) {
+			console.log(layer, undo)
 		}
 
 		addListener(listener) {
@@ -406,7 +413,7 @@
 			this.barHeight = this.barWidth;
 			this.deltaY = this.barHeight + this.margin;
 
-			this.layerCount = 5;
+			this.layerCount = LAYER_COUNT;
 			this.setLayer(0);
 			this.paint();
 
@@ -445,6 +452,58 @@
 		}
 	}
 
+	class HistoryPanel extends CanvasPanel {
+		init() {
+			// todo share with layer panel
+			this.margin = 10;
+			this.barWidth = this.width - this.margin * 2;
+			this.barHeight = this.barWidth;
+			this.deltaY = this.barHeight + this.margin;
+
+			this.layerCount = LAYER_COUNT;
+			this.paint();
+
+			curves.addListener(() => this.paint());
+		}
+
+		touchStart(touch) {
+			this.pick(touch.x, touch.y);
+			this.paint();
+
+		}
+
+		pick(x, y) {
+			let xf = (x - this.margin) / this.barWidth;
+			let yf = (y - this.margin) / this.deltaY;
+			if (xf > 0 && xf < 1 && yf > 0 && yf % 1 < this.barHeight / this.deltaY && yf < this.layerCount)
+				curves.undo(yf - yf % 1, yf % 1 < .5);
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			this.ctx.strokeStyle = cfu(.6);
+			this.ctx.fillStyle = cfu(.4);
+
+			for (let i = .0; i < this.layerCount; i++) {
+				// rect outline
+				this.ctx.strokeRect(this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
+
+				// middle separator
+				this.ctx.beginPath();
+				this.ctx.moveTo(this.margin, i * this.deltaY + this.margin + this.barHeight / 2);
+				this.ctx.lineTo(this.margin + this.barWidth, i * this.deltaY + this.margin + this.barHeight / 2);
+				this.ctx.stroke();
+
+				// icons
+				this.ctx.font = '30px Arial';
+				this.ctx.textBaseline = 'top';
+				let topTextY = i * this.deltaY - fontHeight(this.ctx) / 2 + this.margin + this.barHeight / 4;
+				this.ctx.fillText('<', this.margin * 2, topTextY);
+				this.ctx.fillText('>', this.margin * 2, topTextY + this.barHeight / 2);
+			}
+		}
+	}
+
 	const canvas = $('canvas');
 	const ctx = canvas.getContext('2d');
 
@@ -453,7 +512,8 @@
 	let drawPanel = new DrawPanel(canvas, 0, 0, 800, 800);
 	let colorPanel = new ColorPanel(canvas, 800, 0, 200, 800);
 	let layerPanel = new LayerPanel(canvas, 1000, 0, 100, 800);
-	let panels = [drawPanel, colorPanel, layerPanel];
+	let historyPanel = new HistoryPanel(canvas, 1100, 0, 100, 800);
+	let panels = [drawPanel, colorPanel, layerPanel, historyPanel];
 
 	let outline = new Path2D();
 	panels.forEach(panel => panel.addOutline(outline));
@@ -474,4 +534,8 @@
 	// save
 	// line width, brush style
 	// touch tap to draw small rect
+	// more accuracy and drag movement with key modifiers
+	// zoom
+	// tools such as move, copy, rotate
+	// dim layers on top of selected layer
 </script>
