@@ -38,13 +38,17 @@
 			this.color = color;
 		}
 
+		setBrushWidth(width) {
+			this.brushWidth = width;
+		}
+
 		setLayer(layer) {
 			this.layer = layer;
 		}
 
 		beginCurve() {
 			this.layers[this.layer] = this.layers[this.layer] || this.newLayer();
-			this.curve = {color: this.color, touches: []};
+			this.curve = {color: this.color, width: this.brushWidth, touches: []};
 			this.pressure.reset();
 			this.layers[this.layer].curves.push(this.curve);
 		}
@@ -60,10 +64,14 @@
 				return;
 			let ts = curve.touches.slice(touchesLastIndex - this.n);
 
+			let minWidth = 1;
+			let maxWidth = 11;
+			let selectedMinWidth = curve.width.min * (maxWidth - minWidth) + minWidth;
+			let selectedMaxWidth = curve.width.max * (maxWidth - minWidth) + minWidth;
 			let pressure = ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length;
 			let avgPressure = this.pressure.addValue(pressure);
 			let scaledPressure = scale(avgPressure, 2, 3);
-			let width = scaledPressure ** 2 * 10 + 1;
+			let width = scaledPressure ** 2 * (selectedMaxWidth - selectedMinWidth) + selectedMinWidth;
 
 			ctx.lineWidth = width;
 			ctx.beginPath();
@@ -469,7 +477,7 @@
 
 		touchEnd() {
 			this.selectedDown = null;
-			console.log(this.selectedMin, this.selectedMax); // placeholder
+			curves.setBrushWidth({min: this.selectedMin, max: this.selectedMax});
 		}
 
 		pick(x, y) {
@@ -494,8 +502,8 @@
 			let selected = new Path2D();
 			selected.moveTo(this.margin + this.selectedMin * this.size, middleY - this.selectedMin * this.barHeight / 2);
 			selected.lineTo(this.margin + this.selectedMin * this.size, middleY + this.selectedMin * this.barHeight / 2);
-			selected.lineTo(this.margin + this.selectedMax * this.size, middleY + this.selectedMax * this.barHeight / 2);
-			selected.lineTo(this.margin + this.selectedMax * this.size, middleY - this.selectedMax * this.barHeight / 2);
+			selected.lineTo(this.margin + this.selectedMax * this.size + 1, middleY + this.selectedMax * this.barHeight / 2);
+			selected.lineTo(this.margin + this.selectedMax * this.size + 1, middleY - this.selectedMax * this.barHeight / 2);
 
 			this.ctx.fillStyle = cfu(0);
 			this.ctx.fill(this.outlinePath);
@@ -622,12 +630,14 @@
 	render();
 
 	// todo
+	// undo/redo width incorrect
 	// recent colors
 	// save
-	// line width, brush style
+	// brush style
 	// touch tap to draw small rect
 	// more accuracy and drag movement with key modifiers
 	// zoom
 	// tools such as move, copy, rotate
 	// dim layers on top of selected layer
+	// way to reset inputs
 </script>
