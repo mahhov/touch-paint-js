@@ -106,6 +106,10 @@
 		getLayerCanvas(layer) {
 			return this.layers[layer] && this.layers[layer].canvas;
 		}
+
+		getHistoryLengths(layer) {
+			return this.layers[layer] ? [this.layers[layer].curves.length, this.layers[layer].undoStash.length] : [0, 0];
+		}
 	}
 
 	class Average {
@@ -507,25 +511,15 @@
 
 		paint() {
 			this.ctx.clearRect(0, 0, this.width, this.height);
-			this.ctx.strokeStyle = cfu(.6);
 			this.ctx.fillStyle = cfu(.4);
 
 			for (let i = .0; i < this.layerCount; i++) {
-				// rect outline
-				this.ctx.strokeRect(this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
-
-				// middle separator
-				this.ctx.beginPath();
-				this.ctx.moveTo(this.margin, i * this.deltaY + this.margin + this.barHeight / 2);
-				this.ctx.lineTo(this.margin + this.barWidth, i * this.deltaY + this.margin + this.barHeight / 2);
-				this.ctx.stroke();
-
-				// icons
-				this.ctx.font = '30px Arial';
+				this.ctx.font = '20px Arial';
 				this.ctx.textBaseline = 'top';
 				let topTextY = i * this.deltaY - fontHeight(this.ctx) / 2 + this.margin + this.barHeight / 4;
-				this.ctx.fillText('<', this.margin * 2, topTextY);
-				this.ctx.fillText('>', this.margin * 2, topTextY + this.barHeight / 2);
+				let [undoLength, redoLength] = curves.getHistoryLengths(i);
+				this.ctx.fillText('< ' + undoLength, this.margin * 2, topTextY);
+				this.ctx.fillText('> ' + redoLength, this.margin * 2, topTextY + this.barHeight / 2);
 			}
 		}
 	}
@@ -556,7 +550,6 @@
 
 	// todo
 	// recent colors
-	// undo/redo
 	// save
 	// line width, brush style
 	// touch tap to draw small rect
