@@ -436,6 +436,75 @@
 		}
 	}
 
+	class WidthPanel extends CanvasPanel {
+		init() {
+			this.margin = 10;
+			this.size = this.width - this.margin * 2;
+			this.barHeight = 40;
+
+			this.selectedMin = 0;
+			this.selectedMax = 1;
+
+			this.touchEnd();
+			this.paint();
+		}
+
+		touchStart(touch) {
+			let xf = this.pick(touch.x, touch.y);
+			if (!xf)
+				return;
+			this.selectedDown = this.selectedMin = this.selectedMax = xf;
+			this.paint();
+
+		}
+
+		touchMove(touch) {
+			let xf = this.pick(touch.x, touch.y);
+			if (!xf || !this.selectedDown)
+				return;
+			this.selectedMin = Math.min(this.selectedDown, xf);
+			this.selectedMax = Math.max(this.selectedDown, xf);
+			this.paint();
+		}
+
+		touchEnd() {
+			this.selectedDown = null;
+			console.log(this.selectedMin, this.selectedMax); // placeholder
+		}
+
+		pick(x, y) {
+			let xf = (x - this.margin) / this.size;
+			let yf = (y - this.margin) / this.barHeight;
+			if (xf > 0 && xf < 1 && yf > 0 && yf < 1)
+				return xf;
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+
+			let middleY = this.margin + this.barHeight / 2;
+			if (!this.outlinePath) {
+				this.outlinePath = new Path2D();
+				this.outlinePath.moveTo(this.margin, middleY);
+				this.outlinePath.lineTo(this.margin + this.size, middleY - this.barHeight / 2);
+				this.outlinePath.lineTo(this.margin + this.size, middleY + this.barHeight / 2);
+				this.outlinePath.closePath();
+			}
+
+			let selected = new Path2D();
+			selected.moveTo(this.margin + this.selectedMin * this.size, middleY - this.selectedMin * this.barHeight / 2);
+			selected.lineTo(this.margin + this.selectedMin * this.size, middleY + this.selectedMin * this.barHeight / 2);
+			selected.lineTo(this.margin + this.selectedMax * this.size, middleY + this.selectedMax * this.barHeight / 2);
+			selected.lineTo(this.margin + this.selectedMax * this.size, middleY - this.selectedMax * this.barHeight / 2);
+
+			this.ctx.fillStyle = cfu(0);
+			this.ctx.fill(this.outlinePath);
+			this.ctx.fillStyle = cfu(1);
+			this.ctx.fill(selected);
+			this.ctx.stroke(this.outlinePath);
+		}
+	}
+
 	class LayerPanel extends CanvasPanel {
 		init() {
 			this.margin = 10;
@@ -529,11 +598,15 @@
 
 	let curves = new Curves(800, 800);
 
-	let drawPanel = new DrawPanel(canvas, 0, 0, 800, 800);
-	let colorPanel = new ColorPanel(canvas, 800, 0, 200, 800);
-	let layerPanel = new LayerPanel(canvas, 1000, 0, 100, 800);
-	let historyPanel = new HistoryPanel(canvas, 1100, 0, 100, 800);
-	let panels = [drawPanel, colorPanel, layerPanel, historyPanel];
+	let colorPanelHeight = 370;
+
+	let panels = [
+		new DrawPanel(canvas, 0, 0, 800, 800),
+		new ColorPanel(canvas, 800, 0, 200, colorPanelHeight),
+		new WidthPanel(canvas, 800, colorPanelHeight, 200, 800 - colorPanelHeight),
+		new LayerPanel(canvas, 1000, 0, 100, 800),
+		new HistoryPanel(canvas, 1100, 0, 100, 800),
+	];
 
 	let outline = new Path2D();
 	panels.forEach(panel => panel.addOutline(outline));
