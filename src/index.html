@@ -30,6 +30,7 @@
 				canvas,
 				ctx,
 				curves: [],
+				undoStash: [],
 			};
 		}
 
@@ -50,33 +51,56 @@
 
 		continueCurve(touch) {
 			this.curve.touches.push(touch);
+			this.drawCurve(this.layers[this.layer].ctx, this.curve);
+			curves.notifyListeners();
+		}
 
-			if (this.curve.touches.length < this.n)
+		drawCurve(ctx, curve, touchesLastIndex = curve.touches.length) {
+			if (touchesLastIndex < this.n)
 				return;
-			let ts = this.curve.touches.slice(this.curve.touches.length - this.n);
+			let ts = curve.touches.slice(touchesLastIndex - this.n);
 
 			let pressure = ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length;
 			let avgPressure = this.pressure.addValue(pressure);
 			let scaledPressure = scale(avgPressure, 2, 3);
 			let width = scaledPressure ** 2 * 10 + 1;
 
-			let ctx = this.layers[this.layer].ctx;
 			ctx.lineWidth = width;
 			ctx.beginPath();
 			ctx.moveTo(ts[0].x, ts[0].y);
 			ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
-			ctx.strokeStyle = cf(this.curve.color);
+			ctx.strokeStyle = cf(curve.color);
 			ctx.stroke();
-
-			this.listeners.forEach(listener => listener());
 		}
 
-		undo(layer, undo) {
-			console.log(layer, undo)
+		undo(layerI, undo) {
+			let layer = this.layers[layerI];
+			if (!layer)
+				return;
+
+			if (undo && layer.curves.length)
+				layer.undoStash.push(layer.curves.pop());
+			else if (!undo && layer.undoStash.length)
+				layer.curves.push(layer.undoStash.pop());
+			else
+				return;
+
+			layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+			layer.curves.forEach(curve => {
+				this.pressure.reset();
+				curve.touches.forEach((_, i) =>
+					this.drawCurve(layer.ctx, curve, i));
+			});
+
+			this.notifyListeners();
 		}
 
 		addListener(listener) {
 			this.listeners.push(listener);
+		}
+
+		notifyListeners() {
+			this.listeners.forEach(listener => listener());
 		}
 
 		getLayerCanvas(layer) {
@@ -219,6 +243,10 @@
 	}
 
 	class DrawPanel extends CanvasPanel {
+		init() {
+			curves.addListener(() => this.paint());
+		}
+
 		lastTouches(n) {
 			return this.touches.slice(this.touches.length - n);
 		}
@@ -226,12 +254,10 @@
 		touchStart(touch) {
 			curves.beginCurve();
 			curves.continueCurve(touch);
-			this.paint();
 		}
 
 		touchMove(touch) {
 			curves.continueCurve(touch);
-			this.paint();
 		}
 
 		paint() {
