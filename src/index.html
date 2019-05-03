@@ -603,14 +603,14 @@
 		paint() {
 			this.ctx.clearRect(0, 0, this.width, this.height);
 			this.ctx.fillStyle = cfu(.4);
-			this.ctx.font = '20px Arial';
+			this.ctx.font = '15px Arial';
 			this.ctx.textBaseline = 'top';
 
 			for (let i = .0; i < this.layerCount; i++) {
 				let topTextY = i * this.deltaY - fontHeight(this.ctx) / 2 + this.margin + this.barHeight / 4;
 				let [undoLength, redoLength] = curves.getHistoryLengths(i);
-				this.ctx.fillText('< ' + undoLength, this.margin * 2, topTextY);
-				this.ctx.fillText('> ' + redoLength, this.margin * 2, topTextY + this.barHeight / 2);
+				this.ctx.fillText('< ' + undoLength, this.margin, topTextY);
+				this.ctx.fillText('> ' + redoLength, this.margin, topTextY + this.barHeight / 2);
 			}
 		}
 	}
@@ -618,7 +618,7 @@
 	class ExportPanel extends CanvasPanel {
 		static getHeight() {
 			// hardcoded because we can't calculate actual height before we create the context
-			return 120;
+			return 108;
 		}
 
 		geometryInit() {
@@ -629,7 +629,7 @@
 
 		init() {
 			this.ctx.fillStyle = cfu(.4);
-			this.ctx.font = '20px Arial';
+			this.ctx.font = '15px Arial';
 			this.ctx.textBaseline = 'top';
 			this.buttonHeight = fontHeight(this.ctx) + this.margin;
 			this.paint();
