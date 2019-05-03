@@ -16,7 +16,7 @@
 			this.height = height;
 			this.n = 4;
 			this.layers = [];
-			this.pressure = new Average(.3);
+			this.pressure = new Average(.1);
 			this.listeners = [];
 		}
 
@@ -59,10 +59,10 @@
 			curves.notifyListeners();
 		}
 
-		drawCurve(ctx, curve, touchesLastIndex = curve.touches.length) {
-			if (touchesLastIndex < this.n)
+		drawCurve(ctx, curve, touchesLength = curve.touches.length) {
+			if (touchesLength < this.n)
 				return;
-			let ts = curve.touches.slice(touchesLastIndex - this.n);
+			let ts = curve.touches.slice(touchesLength - this.n, touchesLength);
 
 			let minWidth = 1;
 			let maxWidth = 11;
@@ -97,7 +97,7 @@
 			layer.curves.forEach(curve => {
 				this.pressure.reset();
 				curve.touches.forEach((_, i) =>
-					this.drawCurve(layer.ctx, curve, i));
+					this.drawCurve(layer.ctx, curve, i + 1));
 			});
 
 			this.notifyListeners();
@@ -630,7 +630,6 @@
 	render();
 
 	// todo
-	// undo/redo width incorrect
 	// recent colors
 	// save
 	// brush style
@@ -640,4 +639,5 @@
 	// tools such as move, copy, rotate
 	// dim layers on top of selected layer
 	// way to reset inputs
+	// gradiantly more accurate inputs; e.g., brightness bar will have second row with delta fro selected brightnesss, and further rows with more precise but less range.
 </script>
