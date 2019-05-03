@@ -603,10 +603,10 @@
 		paint() {
 			this.ctx.clearRect(0, 0, this.width, this.height);
 			this.ctx.fillStyle = cfu(.4);
+			this.ctx.font = '20px Arial';
+			this.ctx.textBaseline = 'top';
 
 			for (let i = .0; i < this.layerCount; i++) {
-				this.ctx.font = '20px Arial';
-				this.ctx.textBaseline = 'top';
 				let topTextY = i * this.deltaY - fontHeight(this.ctx) / 2 + this.margin + this.barHeight / 4;
 				let [undoLength, redoLength] = curves.getHistoryLengths(i);
 				this.ctx.fillText('< ' + undoLength, this.margin * 2, topTextY);
@@ -615,16 +615,54 @@
 		}
 	}
 
+	class ExportPanel extends CanvasPanel {
+		static getHeight() {
+			// hardcoded because we can't calculate actual height before we create the context
+			return 120;
+		}
+
+		geometryInit() {
+			this.margin = 10;
+			this.size = this.width - this.margin * 2;
+			this.height = ExportPanel.getHeight();
+		}
+
+		init() {
+			this.ctx.fillStyle = cfu(.4);
+			this.ctx.font = '20px Arial';
+			this.ctx.textBaseline = 'top';
+			this.buttonHeight = fontHeight(this.ctx) + this.margin;
+			this.paint();
+		}
+
+		touchStart(touch) {
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			this.paintButton('PNG', 0);
+			this.paintButton('SAVE', 1);
+			this.paintButton('LOAD', 2);
+		}
+
+		paintButton(text, row) {
+			let top = row * (this.buttonHeight + this.margin) + this.margin;
+			this.ctx.fillText(text, this.margin * 1.5, top + this.margin / 2);
+			this.ctx.strokeRect(this.margin, top, this.size, this.buttonHeight);
+		}
+	}
+
 	const canvas = $('canvas');
 	const ctx = canvas.getContext('2d');
 
 	let curves = new Curves(800, 800);
 
-	let colorPanel;
+	let tempPanel;
 	let panels = [
-		new DrawPanel(canvas, 0, 0, 800, 800),
-		colorPanel = new ColorPanel(canvas, 800, 0, 200),
-		new WidthPanel(canvas, 800, colorPanel.height, 200),
+		tempPanel = new ColorPanel(canvas, 0, 0, 200),
+		new WidthPanel(canvas, 0, tempPanel.y + tempPanel.height, 200),
+		new ExportPanel(canvas, 0, 800 - ExportPanel.getHeight(), 200),
+		new DrawPanel(canvas, 200, 0, 800, 800),
 		new LayerPanel(canvas, 1000, 0, 100, 800),
 		new HistoryPanel(canvas, 1100, 0, 100, 800),
 	];
