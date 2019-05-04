@@ -18,6 +18,7 @@
 			this.layers = [];
 			this.pressure = new Average(.1);
 			this.listeners = [];
+			this.allLayers = this.newLayer();
 		}
 
 		newLayer() {
@@ -81,6 +82,11 @@
 			ctx.stroke();
 		}
 
+		drawAllLayers() {
+			this.allLayers.ctx.clearRect(0, 0, this.allLayers.canvas.width, this.allLayers.canvas.height);
+			this.layers.forEach(({canvas}) => this.allLayers.ctx.drawImage(canvas, 0, 0));
+		}
+
 		undo(layerI, undo) {
 			let layer = this.layers[layerI];
 			if (!layer)
@@ -108,11 +114,16 @@
 		}
 
 		notifyListeners() {
+			this.drawAllLayers();
 			this.listeners.forEach(listener => listener());
 		}
 
 		getLayerCanvas(layer) {
 			return this.layers[layer] && this.layers[layer].canvas;
+		}
+
+		getAllLayersCanvas() {
+			return this.allLayers.canvas;
 		}
 
 		getHistoryLengths(layer) {
@@ -279,7 +290,7 @@
 
 		paint() {
 			this.ctx.clearRect(0, 0, this.width, this.height);
-			curves.layers.forEach(({canvas}) => this.ctx.drawImage(canvas, 0, 0));
+			this.ctx.drawImage(curves.getAllLayersCanvas(), 0, 0);
 		}
 	}
 
@@ -590,7 +601,6 @@
 		touchStart(touch) {
 			this.pick(touch.x, touch.y);
 			this.paint();
-
 		}
 
 		pick(x, y) {
