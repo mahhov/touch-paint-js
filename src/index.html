@@ -642,21 +642,46 @@
 			this.ctx.font = '15px Arial';
 			this.ctx.textBaseline = 'top';
 			this.buttonHeight = fontHeight(this.ctx) + this.margin;
+			this.deltaY = this.buttonHeight + this.margin;
+
+			this.buttons = [
+				{text: 'PNG', handler: this.pngHandler.bind(this)},
+				{text: 'SAVE', handler: this.saveHandler.bind(this)},
+				{text: 'LOAD', handler: this.loadHandler.bind(this)},
+			];
+
 			this.paint();
 		}
 
 		touchStart(touch) {
+			let xf = (touch.x - this.margin) / this.size;
+			let yf = (touch.y - this.margin) / this.deltaY;
+			if (xf > 0 && xf < 1 && yf > 0 && yf % 1 < this.buttonHeight / this.deltaY && yf < this.buttons.length)
+				this.buttons[yf - yf % 1].handler();
+		}
+
+		pngHandler() {
+			this.canvas.toBlob(blob => {
+				let a = document.createElement('a');
+				a.href = URL.createObjectURL(blob);
+				a.download = 'myBlob.png';
+				a.click();
+			});
+		}
+
+		saveHandler() {
+		}
+
+		loadHandler() {
 		}
 
 		paint() {
 			this.ctx.clearRect(0, 0, this.width, this.height);
-			this.paintButton('PNG', 0);
-			this.paintButton('SAVE', 1);
-			this.paintButton('LOAD', 2);
+			this.buttons.forEach(({text}, i) => this.paintButton(text, i));
 		}
 
 		paintButton(text, row) {
-			let top = row * (this.buttonHeight + this.margin) + this.margin;
+			let top = row * this.deltaY + this.margin;
 			this.ctx.fillText(text, this.margin * 1.5, top + this.margin / 2);
 			this.ctx.strokeRect(this.margin, top, this.size, this.buttonHeight);
 		}
