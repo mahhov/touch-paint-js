@@ -645,9 +645,9 @@
 			this.deltaY = this.buttonHeight + this.margin;
 
 			this.buttons = [
-				{text: 'PNG', handler: this.pngHandler.bind(this)},
-				{text: 'SAVE', handler: this.saveHandler.bind(this)},
-				{text: 'LOAD', handler: this.loadHandler.bind(this)},
+				{text: 'PNG', handler: ExportPanel.pngHandler},
+				{text: 'SAVE', handler: ExportPanel.saveHandler},
+				{text: 'LOAD', handler: ExportPanel.loadHandler},
 			];
 
 			this.paint();
@@ -660,19 +660,24 @@
 				this.buttons[yf - yf % 1].handler();
 		}
 
-		pngHandler() {
+		static pngHandler() {
 			curves.getAllLayersCanvas().toBlob(blob => {
 				let a = document.createElement('a');
 				a.href = URL.createObjectURL(blob);
-				a.download = 'myBlob.png';
+				a.download = 'touchPaintExport.png';
 				a.click();
 			});
 		}
 
-		saveHandler() {
+		static saveHandler() {
+			let blob = new Blob([JSON.stringify(curves, null, 2)], {type: 'application/json'});
+			let a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = 'touchPaintExport.json';
+			a.click();
 		}
 
-		loadHandler() {
+		static loadHandler() {
 		}
 
 		paint() {
