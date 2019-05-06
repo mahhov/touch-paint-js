@@ -301,9 +301,9 @@
 			this.barHeight = 40;
 			this.brightnessBarTop = this.size + this.margin * 2;
 			this.alphaBarTop = this.brightnessBarTop + this.barHeight + this.margin;
-			this.selectionSquareTop = this.alphaBarTop + this.barHeight + this.margin;
-			this.selectionSquareSize = this.size / 3;
-			this.height = this.selectionSquareTop + this.selectionSquareSize + this.margin;
+			this.largeSquareTop = this.alphaBarTop + this.barHeight + this.margin;
+			this.largeSquareSize = (this.size - this.margin) / 2;
+			this.height = this.largeSquareTop + this.largeSquareSize + this.margin;
 		}
 
 		init() {
@@ -318,6 +318,7 @@
 			this.alpha = 1;
 			this.circleX = this.circleY = .5;
 			this.setColor(this.colorAt());
+			this.eraser = false;
 			this.paint();
 		}
 
@@ -353,6 +354,7 @@
 			this.pickColor(x, y);
 			this.pickBrightness(x, y);
 			this.pickAlpha(x, y);
+			this.pickEraser(x, y);
 			this.setColor(this.colorAt() || this.color);
 		}
 
@@ -381,12 +383,22 @@
 				this.alpha = xf;
 		}
 
+		pickEraser(x, y) {
+			let deltaX = this.largeSquareSize + this.margin;
+			let xf = (x - this.margin) / deltaX;
+			let yf = (y - this.largeSquareTop) / this.largeSquareSize;
+
+			if (xf > 0 && xf % 1 < this.largeSquareSize / deltaX && xf < 2 && yf > 0 && yf < 1)
+				this.eraser = xf - xf % 1;
+		}
+
 		paint() {
 			this.ctx.clearRect(0, 0, this.width, this.height);
 			this.paintColor();
 			this.paintBrightness();
 			this.paintAlpha();
 			this.paintPreview();
+			this.paintEraser();
 		}
 
 		paintColor() {
@@ -400,6 +412,13 @@
 					this.ctx.fillStyle = selected ? cfu(1) : cf(c);
 					this.ctx.fillRect(x + this.margin, y + this.margin, 1, 1);
 				}
+
+			this.ctx.lineWidth = 1;
+			this.ctx.strokeStyle = cfu(.5);
+			this.ctx.beginPath();
+			let r = this.size / 2;
+			this.ctx.arc(r + this.margin, r + this.margin, r, r, 0, Math.PI * 2);
+			this.ctx.stroke();
 		}
 
 		paintBrightness() {
@@ -427,15 +446,26 @@
 		}
 
 		paintPreview() {
-			let left = this.margin + this.selectionSquareSize;
+			let left = this.margin;
 
-			this.paintCheckBackground(left, this.selectionSquareTop, this.selectionSquareSize, this.selectionSquareSize);
+			this.paintCheckBackground(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
 
 			this.ctx.fillStyle = cf(this.color);
-			this.ctx.fillRect(left, this.selectionSquareTop, this.selectionSquareSize, this.selectionSquareSize);
+			this.ctx.fillRect(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
 
-			this.ctx.strokeStyle = cfu(.5);
-			this.ctx.strokeRect(left, this.selectionSquareTop, this.selectionSquareSize, this.selectionSquareSize);
+			this.ctx.strokeStyle = cfu(!this.eraser ? 0 : .5);
+			this.ctx.lineWidth = !this.eraser ? 3 : 1;
+			this.ctx.strokeRect(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
+		}
+
+		paintEraser() {
+			let left = this.largeSquareSize + this.margin * 2;
+
+			this.paintCheckBackground(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
+
+			this.ctx.strokeStyle = cfu(this.eraser ? 0 : .5);
+			this.ctx.lineWidth = this.eraser ? 3 : 1;
+			this.ctx.strokeRect(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
 		}
 
 		paintBarSelectionAndOutline(barTop, selection) {
@@ -444,6 +474,7 @@
 			this.ctx.fillStyle = cfu(1);
 			this.ctx.fillRect(selectionLeft * this.size + this.margin, barTop, selectionWidth * this.size, this.barHeight);
 			this.ctx.strokeStyle = cfu(.5);
+			this.ctx.lineWidth = 1;
 			this.ctx.strokeRect(selectionLeft * this.size + this.margin, barTop, selectionWidth * this.size, this.barHeight);
 
 			this.ctx.strokeRect(this.margin, barTop, this.size, this.barHeight);
@@ -721,6 +752,7 @@
 	render();
 
 	// todo
+	// eraser
 	// recent colors
 	// save
 	// brush style
