@@ -78,7 +78,13 @@
 			ctx.beginPath();
 			ctx.moveTo(ts[0].x, ts[0].y);
 			ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
-			ctx.strokeStyle = cf(curve.color);
+			if (curve.color.eraser) {
+				ctx.globalCompositeOperation = 'destination-out';
+				ctx.fillStyle = cfu(0);
+			} else {
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.strokeStyle = cf(curve.color);
+			}
 			ctx.stroke();
 		}
 
@@ -317,7 +323,7 @@
 			this.brightness = .5;
 			this.alpha = 1;
 			this.circleX = this.circleY = .5;
-			this.setColor(this.colorAt());
+			this.setColor();
 			this.eraser = false;
 			this.paint();
 		}
@@ -334,9 +340,7 @@
 		}
 
 		colorAt(xf = this.circleX, yf = this.circleY) {
-			let radius = dist(xf, yf, .5, .5);
-
-			if (radius > .5)
+			if (dist(xf, yf, .5, .5) > .5)
 				return;
 
 			let r = 1 + this.brightness - dist(xf, yf, this.rx, this.ry);
@@ -345,9 +349,9 @@
 			return {r, g, b, a: this.alpha};
 		}
 
-		setColor(color) {
-			this.color = color;
-			curves.setColor(color);
+		setColor() {
+			this.color = this.colorAt() || this.color;
+			curves.setColor(this.eraser ? {eraser: true} : this.color);
 		}
 
 		pick(x, y) {
@@ -355,7 +359,7 @@
 			this.pickBrightness(x, y);
 			this.pickAlpha(x, y);
 			this.pickEraser(x, y);
-			this.setColor(this.colorAt() || this.color);
+			this.setColor();
 		}
 
 		pickColor(x, y) {
@@ -752,7 +756,6 @@
 	render();
 
 	// todo
-	// eraser
 	// recent colors
 	// save
 	// brush style
