@@ -35,6 +35,10 @@
 			};
 		}
 
+		getLayer(index = this.layer) {
+			return this.layers[index] = this.layers[index] || this.newLayer();
+		}
+
 		setColor(color) {
 			this.color = color;
 		}
@@ -48,15 +52,14 @@
 		}
 
 		beginCurve() {
-			this.layers[this.layer] = this.layers[this.layer] || this.newLayer();
 			this.curve = {color: this.color, width: this.brushWidth, touches: []};
 			this.pressure.reset();
-			this.layers[this.layer].curves.push(this.curve);
+			this.getLayer().curves.push(this.curve);
 		}
 
 		continueCurve(touch) {
 			this.curve.touches.push(touch);
-			this.drawCurve(this.layers[this.layer].ctx, this.curve);
+			this.drawCurve(this.getLayer().ctx, this.curve);
 			curves.notifyListeners();
 		}
 
@@ -94,9 +97,9 @@
 		}
 
 		undo(layerI, undo) {
-			let layer = this.layers[layerI];
-			if (!layer)
+			if (!this.layers[layerI])
 				return;
+			let layer = this.getLayer(layerI);
 
 			if (undo && layer.curves.length)
 				layer.undoStash.push(layer.curves.pop());
@@ -105,18 +108,23 @@
 			else
 				return;
 
+			this.redrawLayer(layerI);
+			this.notifyListeners();
+		}
+
+		addListener(listener) {
+			this.listeners.push(listener);
+		}
+
+		redrawLayer(layerI) {
+			let layer = this.getLayer(layerI);
+			console.log('redraw', layerI)
 			layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
 			layer.curves.forEach(curve => {
 				this.pressure.reset();
 				curve.touches.forEach((_, i) =>
 					this.drawCurve(layer.ctx, curve, i + 1));
 			});
-
-			this.notifyListeners();
-		}
-
-		addListener(listener) {
-			this.listeners.push(listener);
 		}
 
 		notifyListeners() {
@@ -134,6 +142,29 @@
 
 		getHistoryLengths(layer) {
 			return this.layers[layer] ? [this.layers[layer].curves.length, this.layers[layer].undoStash.length] : [0, 0];
+		}
+
+		saveLayers() {
+			return this.layers.map(layer => layer.curves);
+		}
+
+		loadLayers(data) {
+			// todo don't lazy load layers array so that we can simplify this junky implementation and similarly above
+			data.forEach((layerCurves, i) => {
+				if (layerCurves)
+					this.getLayer(i).curves = layerCurves;
+				else if (this.layers[i])
+					this.getLayer(i).curves = [];
+				this.redrawLayer(i);
+			});
+			console.log(this.layers, data.length)
+			this.layers.forEach((layer, i) => {
+				if (i >= data.length) {
+					layer.curves = [];
+					this.redrawLayer(i);
+				}
+			});
+			this.notifyListeners();
 		}
 	}
 
@@ -705,7 +736,7 @@
 		}
 
 		static saveHandler() {
-			let blob = new Blob([JSON.stringify(curves, null, 2)], {type: 'application/json'});
+			let blob = new Blob([JSON.stringify(curves.saveLayers(), null, 2)], {type: 'application/json'});
 			let a = document.createElement('a');
 			a.href = URL.createObjectURL(blob);
 			a.download = 'touchPaintExport.json';
@@ -713,6 +744,23 @@
 		}
 
 		static loadHandler() {
+			let input = document.createElement('input');
+			input.type = 'file';
+			input.accept = 'application/json';
+			input.click();
+			input.addEventListener('change', () => {
+				let fileReader = new FileReader();
+				fileReader.readAsText(input.files[0]);
+				fileReader.addEventListener('load', () => {
+					let data;
+					try {
+						data = JSON.parse(fileReader.result);
+					} catch {
+						console.error('unable to read');
+					}
+					curves.loadLayers(data);
+				})
+			});
 		}
 
 		paint() {
@@ -757,7 +805,6 @@
 
 	// todo
 	// recent colors
-	// save
 	// brush style
 	// touch tap to draw small rect
 	// more accuracy and drag movement with key modifiers
