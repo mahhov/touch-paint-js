@@ -75,17 +75,18 @@
 			let scaledPressure = scale(avgPressure, 2, 3);
 			let width = scaledPressure ** 2 * (selectedMaxWidth - selectedMinWidth) + selectedMinWidth;
 
-			ctx.lineWidth = width;
+			if (curve.color.eraser) {
+				ctx.globalCompositeOperation = 'destination-out';
+				ctx.lineWidth = width * 5;
+			} else {
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.lineWidth = width;
+				ctx.strokeStyle = cf(curve.color);
+			}
+
 			ctx.beginPath();
 			ctx.moveTo(ts[0].x, ts[0].y);
 			ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
-			if (curve.color.eraser) {
-				ctx.globalCompositeOperation = 'destination-out';
-				ctx.fillStyle = cfu(0);
-			} else {
-				ctx.globalCompositeOperation = 'source-over';
-				ctx.strokeStyle = cf(curve.color);
-			}
 			ctx.stroke();
 		}
 
