@@ -80,8 +80,8 @@
 				ctx.lineWidth = width * 5;
 			} else {
 				ctx.globalCompositeOperation = 'source-over';
-				ctx.lineWidth = width;
 				ctx.strokeStyle = cf(curve.color);
+				ctx.lineWidth = width;
 			}
 
 			ctx.beginPath();
@@ -317,15 +317,24 @@
 	}
 
 	class ColorPanel extends CanvasPanel {
+		static recentColorColumns = 4;
+		static recentColorRows = 4;
+
 		geometryInit() {
 			this.margin = 10;
 			this.size = this.width - this.margin * 2;
+
 			this.barHeight = 40;
 			this.brightnessBarTop = this.size + this.margin * 2;
 			this.alphaBarTop = this.brightnessBarTop + this.barHeight + this.margin;
+
 			this.largeSquareTop = this.alphaBarTop + this.barHeight + this.margin;
 			this.largeSquareSize = (this.size - this.margin) / 2;
-			this.height = this.largeSquareTop + this.largeSquareSize + this.margin;
+
+			this.recentColorTop = this.largeSquareTop + this.largeSquareSize + this.margin;
+			this.recentColorSize = (this.size - this.margin * (ColorPanel.recentColorColumns - 1)) / ColorPanel.recentColorColumns;
+
+			this.height = this.recentColorTop + (this.recentColorSize + this.margin) * ColorPanel.recentColorRows;
 		}
 
 		init() {
@@ -341,6 +350,11 @@
 			this.circleX = this.circleY = .5;
 			this.setColor();
 			this.eraser = false;
+
+			this.recentColor = [];
+			for (let i = 0; i < 10; i++)
+				this.recentColor.push({circleX: this.circleX, circleY: this.circleY, brightness: this.brightness, alpha: this.alpha});
+
 			this.paint();
 		}
 
@@ -419,6 +433,7 @@
 			this.paintAlpha();
 			this.paintPreview();
 			this.paintEraser();
+			this.paintRecentColor();
 		}
 
 		paintColor() {
@@ -486,6 +501,17 @@
 			this.ctx.strokeStyle = cfu(this.eraser ? 0 : .5);
 			this.ctx.lineWidth = this.eraser ? 3 : 1;
 			this.ctx.strokeRect(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
+		}
+
+		paintRecentColor() {
+			this.ctx.strokeStyle = cfu(0);
+			this.ctx.lineWidth = 1;
+
+			let deltaXY = this.recentColorSize + this.margin;
+			for (let x = 0; x < ColorPanel.recentColorColumns; x++)
+				for (let y = 0; y < ColorPanel.recentColorRows; y++) {
+					this.ctx.strokeRect(x * deltaXY + this.margin, y * deltaXY + this.recentColorTop, this.recentColorSize, this.recentColorSize);
+				}
 		}
 
 		paintBarSelectionAndOutline(barTop, selection) {
