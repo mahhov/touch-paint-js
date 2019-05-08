@@ -16,6 +16,8 @@
 			this.height = height;
 			this.n = 4;
 			this.layers = [];
+			for (let i = 0; i < LAYER_COUNT; i++)
+				this.layers.push(this.newLayer());
 			this.pressure = new Average(.1);
 			this.listeners = [];
 			this.allLayers = this.newLayer();
@@ -35,10 +37,6 @@
 			};
 		}
 
-		getLayer(index = this.layer) {
-			return this.layers[index] = this.layers[index] || this.newLayer();
-		}
-
 		setColor(color) {
 			this.color = color;
 		}
@@ -54,12 +52,12 @@
 		beginCurve() {
 			this.curve = {color: this.color, width: this.brushWidth, touches: []};
 			this.pressure.reset();
-			this.getLayer().curves.push(this.curve);
+			this.layers[this.layer].curves.push(this.curve);
 		}
 
 		continueCurve(touch) {
 			this.curve.touches.push(touch);
-			this.drawCurve(this.getLayer().ctx, this.curve);
+			this.drawCurve(this.layers[this.layer].ctx, this.curve);
 			curves.notifyListeners();
 		}
 
@@ -97,9 +95,7 @@
 		}
 
 		undo(layerI, undo) {
-			if (!this.layers[layerI])
-				return;
-			let layer = this.getLayer(layerI);
+			let layer = this.layers[layerI];
 
 			if (undo && layer.curves.length)
 				layer.undoStash.push(layer.curves.pop());
@@ -117,8 +113,7 @@
 		}
 
 		redrawLayer(layerI) {
-			let layer = this.getLayer(layerI);
-			console.log('redraw', layerI)
+			let layer = this.layers[layerI];
 			layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
 			layer.curves.forEach(curve => {
 				this.pressure.reset();
@@ -132,8 +127,8 @@
 			this.listeners.forEach(listener => listener());
 		}
 
-		getLayerCanvas(layer) {
-			return this.layers[layer] && this.layers[layer].canvas;
+		getLayerCanvas(layerI) {
+			return this.layers[layerI].canvas;
 		}
 
 		getAllLayersCanvas() {
@@ -141,7 +136,7 @@
 		}
 
 		getHistoryLengths(layer) {
-			return this.layers[layer] ? [this.layers[layer].curves.length, this.layers[layer].undoStash.length] : [0, 0];
+			return [this.layers[layer].curves.length, this.layers[layer].undoStash.length];
 		}
 
 		saveLayers() {
@@ -149,20 +144,9 @@
 		}
 
 		loadLayers(data) {
-			// todo don't lazy load layers array so that we can simplify this junky implementation and similarly above
 			data.forEach((layerCurves, i) => {
-				if (layerCurves)
-					this.getLayer(i).curves = layerCurves;
-				else if (this.layers[i])
-					this.getLayer(i).curves = [];
+				this.layers[i].curves = layerCurves;
 				this.redrawLayer(i);
-			});
-			console.log(this.layers, data.length)
-			this.layers.forEach((layer, i) => {
-				if (i >= data.length) {
-					layer.curves = [];
-					this.redrawLayer(i);
-				}
 			});
 			this.notifyListeners();
 		}
@@ -641,8 +625,7 @@
 					this.ctx.strokeStyle = cfu(0);
 				else
 					this.ctx.strokeStyle = cfu(.6);
-				if (curves.getLayerCanvas(i))
-					this.ctx.drawImage(curves.getLayerCanvas(i), this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
+				this.ctx.drawImage(curves.getLayerCanvas(i), this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
 				this.ctx.strokeRect(this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
 			}
 		}
