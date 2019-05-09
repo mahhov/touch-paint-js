@@ -351,9 +351,9 @@
 			this.setColor();
 			this.eraser = false;
 
-			this.recentColor = [];
-			for (let i = 0; i < 10; i++)
-				this.recentColor.push({circleX: this.circleX, circleY: this.circleY, brightness: this.brightness, alpha: this.alpha});
+			this.recentColors = [];
+			for (let i = 0; i < ColorPanel.recentColorColumns * ColorPanel.recentColorRows; i++)
+				this.recentColors.push({circleX: this.circleX, circleY: this.circleY, brightness: this.brightness, alpha: this.alpha});
 
 			this.paint();
 		}
@@ -369,13 +369,13 @@
 
 		}
 
-		colorAt(xf = this.circleX, yf = this.circleY) {
+		colorAt(xf = this.circleX, yf = this.circleY, brightness = this.brightness) {
 			if (dist(xf, yf, .5, .5) > .5)
 				return;
 
-			let r = 1 + this.brightness - dist(xf, yf, this.rx, this.ry);
-			let g = 1 + this.brightness - dist(xf, yf, this.gx, this.gy);
-			let b = 1 + this.brightness - dist(xf, yf, this.bx, this.by);
+			let r = 1 + brightness - dist(xf, yf, this.rx, this.ry);
+			let g = 1 + brightness - dist(xf, yf, this.gx, this.gy);
+			let b = 1 + brightness - dist(xf, yf, this.bx, this.by);
 			return {r, g, b, a: this.alpha};
 		}
 
@@ -389,6 +389,7 @@
 			this.pickBrightness(x, y);
 			this.pickAlpha(x, y);
 			this.pickEraser(x, y);
+			this.pickRecentColor(x, y);
 			this.setColor();
 		}
 
@@ -424,6 +425,16 @@
 
 			if (xf > 0 && xf % 1 < this.largeSquareSize / deltaX && xf < 2 && yf > 0 && yf < 1)
 				this.eraser = xf - xf % 1;
+		}
+
+		pickRecentColor(x, y) {
+			let deltaXY = this.recentColorSize + this.margin;
+			let xf = (x - this.margin) / deltaXY;
+			let yf = (y - this.recentColorTop) / deltaXY;
+
+			if (xf > 0 && xf % 1 < this.recentColorSize / deltaXY && xf < ColorPanel.recentColorColumns &&
+				yf > 0 && yf % 1 < this.recentColorSize / deltaXY && yf < ColorPanel.recentColorRows)
+				console.log(xf - xf % 1, yf - yf % 1);
 		}
 
 		paint() {
@@ -510,6 +521,9 @@
 			let deltaXY = this.recentColorSize + this.margin;
 			for (let x = 0; x < ColorPanel.recentColorColumns; x++)
 				for (let y = 0; y < ColorPanel.recentColorRows; y++) {
+					let color = this.recentColors[y * ColorPanel.recentColorColumns + x];
+					this.ctx.fillStyle = cf(this.colorAt(color.circleX, color.circleY, color.brightness));
+					this.ctx.fillRect(x * deltaXY + this.margin, y * deltaXY + this.recentColorTop, this.recentColorSize, this.recentColorSize);
 					this.ctx.strokeRect(x * deltaXY + this.margin, y * deltaXY + this.recentColorTop, this.recentColorSize, this.recentColorSize);
 				}
 		}
