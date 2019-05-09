@@ -90,11 +90,6 @@
 			ctx.stroke();
 		}
 
-		drawAllLayers() {
-			this.allLayers.ctx.clearRect(0, 0, this.allLayers.canvas.width, this.allLayers.canvas.height);
-			this.layers.forEach(({canvas}) => this.allLayers.ctx.drawImage(canvas, 0, 0));
-		}
-
 		undo(layerI, undo) {
 			let layer = this.layers[layerI];
 
@@ -109,10 +104,6 @@
 			this.notifyListeners();
 		}
 
-		addListener(listener) {
-			this.listeners.push(listener);
-		}
-
 		redrawLayer(layerI) {
 			let layer = this.layers[layerI];
 			layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
@@ -121,6 +112,15 @@
 				curve.touches.forEach((_, i) =>
 					this.drawCurve(layer.ctx, curve, i + 1));
 			});
+		}
+
+		drawAllLayers() {
+			this.allLayers.ctx.clearRect(0, 0, this.allLayers.canvas.width, this.allLayers.canvas.height);
+			this.layers.forEach(({canvas}) => this.allLayers.ctx.drawImage(canvas, 0, 0));
+		}
+
+		addListener(listener) {
+			this.listeners.push(listener);
 		}
 
 		notifyListeners() {
