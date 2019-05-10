@@ -394,14 +394,14 @@
 			this.paint()
 		}
 
-		colorAt(xf = this.circleX, yf = this.circleY, brightness = this.brightness) {
+		colorAt(xf = this.circleX, yf = this.circleY, brightness = this.brightness, alpha = this.alpha) {
 			if (dist(xf, yf, .5, .5) > .5)
 				return;
 
 			let r = 1 + brightness - dist(xf, yf, this.rx, this.ry);
 			let g = 1 + brightness - dist(xf, yf, this.gx, this.gy);
 			let b = 1 + brightness - dist(xf, yf, this.bx, this.by);
-			return {r, g, b, a: this.alpha};
+			return {r, g, b, a: alpha};
 		}
 
 		setColor() {
@@ -551,7 +551,7 @@
 			for (let x = 0; x < ColorPanel.recentColorColumns; x++)
 				for (let y = 0; y < ColorPanel.recentColorRows; y++) {
 					let color = this.recentColors[y * ColorPanel.recentColorColumns + x];
-					this.ctx.fillStyle = cf(this.colorAt(color.circleX, color.circleY, color.brightness));
+					this.ctx.fillStyle = cf(this.colorAt(color.circleX, color.circleY, color.brightness, color.alpha));
 					this.ctx.fillRect(x * deltaXY + this.margin, y * deltaXY + this.recentColorTop, this.recentColorSize, this.recentColorSize);
 					this.ctx.strokeRect(x * deltaXY + this.margin, y * deltaXY + this.recentColorTop, this.recentColorSize, this.recentColorSize);
 				}
