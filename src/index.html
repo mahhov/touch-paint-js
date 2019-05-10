@@ -550,10 +550,12 @@
 			let deltaXY = this.recentColorSize + this.margin;
 			for (let x = 0; x < ColorPanel.recentColorColumns; x++)
 				for (let y = 0; y < ColorPanel.recentColorRows; y++) {
+					let rect = [x * deltaXY + this.margin, y * deltaXY + this.recentColorTop, this.recentColorSize, this.recentColorSize];
+					this.paintCheckBackground(...rect);
 					let color = this.recentColors[y * ColorPanel.recentColorColumns + x];
 					this.ctx.fillStyle = cf(this.colorAt(color.circleX, color.circleY, color.brightness, color.alpha));
-					this.ctx.fillRect(x * deltaXY + this.margin, y * deltaXY + this.recentColorTop, this.recentColorSize, this.recentColorSize);
-					this.ctx.strokeRect(x * deltaXY + this.margin, y * deltaXY + this.recentColorTop, this.recentColorSize, this.recentColorSize);
+					this.ctx.fillRect(...rect);
+					this.ctx.strokeRect(...rect);
 				}
 		}
 
