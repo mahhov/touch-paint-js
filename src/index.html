@@ -20,6 +20,7 @@
 				this.layers.push(this.newLayer());
 			this.pressure = new Average(.1);
 			this.listeners = [];
+			this.beginCurveListeners = [];
 			this.allLayers = this.newLayer();
 		}
 
@@ -53,6 +54,7 @@
 			this.curve = {color: this.color, width: this.brushWidth, touches: []};
 			this.pressure.reset();
 			this.layers[this.layer].curves.push(this.curve);
+			this.notifyBeginCurveListeners();
 		}
 
 		continueCurve(touch) {
@@ -123,9 +125,17 @@
 			this.listeners.push(listener);
 		}
 
+		addBeginCurveListener(listener) {
+			this.beginCurveListeners.push(listener);
+		}
+
 		notifyListeners() {
 			this.drawAllLayers();
 			this.listeners.forEach(listener => listener());
+		}
+
+		notifyBeginCurveListeners() {
+			this.beginCurveListeners.forEach(listener => listener());
 		}
 
 		getLayerCanvas(layerI) {
@@ -353,9 +363,15 @@
 
 			this.recentColors = [];
 			for (let i = 0; i < ColorPanel.recentColorColumns * ColorPanel.recentColorRows; i++)
-				this.recentColors.push({circleX: this.circleX, circleY: this.circleY, brightness: this.brightness, alpha: this.alpha});
+				this.recentColors.push(this.currentColorObj);
 
 			this.paint();
+
+			curves.addBeginCurveListener(() => this.checkAddingRecentColor());
+		}
+
+		get currentColorObj() {
+			return {circleX: this.circleX, circleY: this.circleY, brightness: this.brightness, alpha: this.alpha};
 		}
 
 		touchStart(touch) {
@@ -367,6 +383,15 @@
 			this.pick(touch.x, touch.y);
 			this.paint();
 
+		}
+
+		checkAddingRecentColor() {
+			let currentColor = this.currentColorObj;
+			if (this.recentColors.some(color => Object.entries(currentColor).every(([key, value]) => value === color[key])))
+				return;
+			this.recentColors.pop();
+			this.recentColors.unshift(currentColor);
+			this.paint()
 		}
 
 		colorAt(xf = this.circleX, yf = this.circleY, brightness = this.brightness) {
