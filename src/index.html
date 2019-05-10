@@ -387,9 +387,8 @@
 
 		checkAddingRecentColor() {
 			let currentColor = this.currentColorObj;
-			if (this.recentColors.some(color => Object.entries(currentColor).every(([key, value]) => value === color[key])))
-				return;
-			this.recentColors.pop();
+			let index = this.recentColors.findIndex(color => Object.entries(currentColor).every(([key, value]) => value === color[key]));
+			this.recentColors.splice(index, 1);
 			this.recentColors.unshift(currentColor);
 			this.paint()
 		}
@@ -859,7 +858,6 @@
 	render();
 
 	// todo
-	// recent colors
 	// brush style
 	// touch tap to draw small rect
 	// more accuracy and drag movement with key modifiers
