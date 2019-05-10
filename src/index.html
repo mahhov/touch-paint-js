@@ -458,8 +458,12 @@
 			let yf = (y - this.recentColorTop) / deltaXY;
 
 			if (xf > 0 && xf % 1 < this.recentColorSize / deltaXY && xf < ColorPanel.recentColorColumns &&
-				yf > 0 && yf % 1 < this.recentColorSize / deltaXY && yf < ColorPanel.recentColorRows)
-				console.log(xf - xf % 1, yf - yf % 1);
+				yf > 0 && yf % 1 < this.recentColorSize / deltaXY && yf < ColorPanel.recentColorRows) {
+				let x = xf - xf % 1;
+				let y = yf - yf % 1;
+				let i = y * ColorPanel.recentColorColumns + x;
+				({circleX: this.circleX, circleY: this.circleY, brightness: this.brightness, alpha: this.alpha} = this.recentColors[i]);
+			}
 		}
 
 		paint() {
