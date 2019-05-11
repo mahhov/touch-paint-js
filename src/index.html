@@ -63,33 +63,61 @@
 			curves.notifyListeners();
 		}
 
+		endCurve() {
+			this.drawCurveEnd(this.layers[this.layer].ctx, this.curve);
+			curves.notifyListeners();
+		}
+
 		drawCurve(ctx, curve, touchesLength = curve.touches.length) {
 			if (touchesLength < this.n)
 				return;
 			let ts = curve.touches.slice(touchesLength - this.n, touchesLength);
 
-			let minWidth = 1;
-			let maxWidth = 11;
-			let selectedMinWidth = curve.width.min * (maxWidth - minWidth) + minWidth;
-			let selectedMaxWidth = curve.width.max * (maxWidth - minWidth) + minWidth;
-			let pressure = ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length;
-			let avgPressure = this.pressure.addValue(pressure);
-			let scaledPressure = scale(avgPressure, 2, 3);
-			let width = scaledPressure ** 2 * (selectedMaxWidth - selectedMinWidth) + selectedMinWidth;
+			let width = this.getPressureWidth(curve.width.min, curve.width.max, ts);
 
 			if (curve.color.eraser) {
+				width *= 5;
 				ctx.globalCompositeOperation = 'destination-out';
-				ctx.lineWidth = width * 5;
 			} else {
 				ctx.globalCompositeOperation = 'source-over';
 				ctx.strokeStyle = cf(curve.color);
-				ctx.lineWidth = width;
 			}
 
+			ctx.lineWidth = width;
 			ctx.beginPath();
 			ctx.moveTo(ts[0].x, ts[0].y);
 			ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
 			ctx.stroke();
+		}
+
+		drawCurveEnd(ctx, curve, touchesLength = curve.touches.length) {
+			if (touchesLength >= this.n)
+				return;
+			let ts = curve.touches.slice(0, touchesLength);
+
+			let size = this.getPressureWidth(curve.width.min, curve.width.max, ts);
+
+			if (curve.color.eraser) {
+				size *= 5;
+				ctx.globalCompositeOperation = 'destination-out';
+			} else {
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.fillStyle = cf(curve.color);
+			}
+
+			let avgX = ts.reduce((a, {x}) => a + x, 0) / ts.length;
+			let avgY = ts.reduce((a, {y}) => a + y, 0) / ts.length;
+
+			ctx.fillRect(avgX - size / 2, avgY - size / 2, size, size);
+		}
+
+		getPressureWidth(minF, maxF, ts) {
+			let minWidth = minF * 10 + 1;
+			let maxWidth = maxF * 10 + 1;
+			let avgTouchSize = ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length;
+			let avgPressure = this.pressure.addValue(avgTouchSize);
+			let scaledPressure = scale(avgPressure, 2, 3);
+			return scaledPressure ** 2 * (maxWidth - minWidth) + minWidth;
 		}
 
 		undo(layerI, undo) {
@@ -113,6 +141,7 @@
 				this.pressure.reset();
 				curve.touches.forEach((_, i) =>
 					this.drawCurve(layer.ctx, curve, i + 1));
+				this.drawCurveEnd(layer.ctx, curve, curve.length);
 			});
 		}
 
@@ -318,6 +347,10 @@
 
 		touchMove(touch) {
 			curves.continueCurve(touch);
+		}
+
+		touchEnd() {
+			curves.endCurve();
 		}
 
 		paint() {
@@ -859,11 +892,11 @@
 
 	// todo
 	// brush style
-	// touch tap to draw small rect
 	// more accuracy and drag movement with key modifiers
 	// zoom
 	// tools such as move, copy, rotate
 	// dim layers on top of selected layer
 	// way to reset inputs
 	// gradiantly more accurate inputs; e.g., brightness bar will have second row with delta fro selected brightnesss, and further rows with more precise but less range.
+	// keyboard shortcuts
 </script>
