@@ -1,0 +1,898 @@
+<canvas width="1200" height="800"></canvas>
+
+<script>
+	const $ = document.querySelector.bind(document);
+	const cf = ({r, g, b, a = 1}) => `rgba(${r * 255}, ${g * 255}, ${b * 255}, ${a})`;
+	const cfu = (v, a = 1) => `rgba(${v * 255}, ${v * 255}, ${v * 255}, ${a})`;
+	const dist = (x, y, x2, y2) => Math.sqrt((x - x2) ** 2 + (y - y2) ** 2);
+	const scale = (v, min, max) => Math.min(Math.max((v - min) / (max - min), 0), 1);
+	const fontHeight = ctx => ctx.measureText('M').width * .99;
+	const font15Height = 13; // todo more precise
+
+	const LAYER_COUNT = 5;
+
+	class Curves {
+		constructor(width, height) {
+			this.width = width;
+			this.height = height;
+			this.n = 4;
+			this.layers = [];
+			for (let i = 0; i < LAYER_COUNT; i++)
+				this.layers.push(this.newLayer());
+			this.pressure = new Average(.1);
+			this.listeners = [];
+			this.beginCurveListeners = [];
+			this.allLayers = this.newLayer();
+		}
+
+		newLayer() {
+			let canvas = document.createElement('canvas');
+			canvas.width = this.width;
+			canvas.height = this.height;
+			let ctx = canvas.getContext('2d');
+
+			return {
+				canvas,
+				ctx,
+				curves: [],
+				undoStash: [],
+			};
+		}
+
+		setColor(color) {
+			this.color = color;
+		}
+
+		setBrushWidth(width) {
+			this.brushWidth = width;
+		}
+
+		setLayer(layer) {
+			this.layer = layer;
+		}
+
+		beginCurve() {
+			this.curve = {color: this.color, width: this.brushWidth, touches: []};
+			this.pressure.reset();
+			this.layers[this.layer].curves.push(this.curve);
+			this.notifyBeginCurveListeners();
+		}
+
+		continueCurve(touch) {
+			this.curve.touches.push(touch);
+			this.drawCurve(this.layers[this.layer].ctx, this.curve);
+			curves.notifyListeners();
+		}
+
+		endCurve() {
+			this.drawCurveEnd(this.layers[this.layer].ctx, this.curve);
+			curves.notifyListeners();
+		}
+
+		drawCurve(ctx, curve, touchesLength = curve.touches.length) {
+			if (touchesLength < this.n)
+				return;
+			let ts = curve.touches.slice(touchesLength - this.n, touchesLength);
+
+			let width = this.getPressureWidth(curve.width.min, curve.width.max, ts);
+
+			if (curve.color.eraser) {
+				width *= 5;
+				ctx.globalCompositeOperation = 'destination-out';
+			} else {
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.strokeStyle = cf(curve.color);
+			}
+
+			ctx.lineWidth = width;
+			ctx.beginPath();
+			ctx.moveTo(ts[0].x, ts[0].y);
+			ctx.bezierCurveTo(ts[1].x, ts[1].y, ts[2].x, ts[2].y, ts[3].x, ts[3].y);
+			ctx.stroke();
+		}
+
+		drawCurveEnd(ctx, curve, touchesLength = curve.touches.length) {
+			if (touchesLength >= this.n)
+				return;
+			let ts = curve.touches.slice(0, touchesLength);
+
+			let size = this.getPressureWidth(curve.width.min, curve.width.max, ts);
+
+			if (curve.color.eraser) {
+				size *= 5;
+				ctx.globalCompositeOperation = 'destination-out';
+			} else {
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.fillStyle = cf(curve.color);
+			}
+
+			let avgX = ts.reduce((a, {x}) => a + x, 0) / ts.length;
+			let avgY = ts.reduce((a, {y}) => a + y, 0) / ts.length;
+
+			ctx.fillRect(avgX - size / 2, avgY - size / 2, size, size);
+		}
+
+		getPressureWidth(minF, maxF, ts) {
+			let minWidth = minF * 10 + 1;
+			let maxWidth = maxF * 10 + 1;
+			let avgTouchSize = ts.reduce((a, {w, h}) => a + w + h, 0) / ts.length;
+			let avgPressure = this.pressure.addValue(avgTouchSize);
+			let scaledPressure = scale(avgPressure, 2, 3);
+			return scaledPressure ** 2 * (maxWidth - minWidth) + minWidth;
+		}
+
+		undo(layerI, undo) {
+			let layer = this.layers[layerI];
+
+			if (undo && layer.curves.length)
+				layer.undoStash.push(layer.curves.pop());
+			else if (!undo && layer.undoStash.length)
+				layer.curves.push(layer.undoStash.pop());
+			else
+				return;
+
+			this.redrawLayer(layerI);
+			this.notifyListeners();
+		}
+
+		redrawLayer(layerI) {
+			let layer = this.layers[layerI];
+			layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+			layer.curves.forEach(curve => {
+				this.pressure.reset();
+				curve.touches.forEach((_, i) =>
+					this.drawCurve(layer.ctx, curve, i + 1));
+				this.drawCurveEnd(layer.ctx, curve, curve.length);
+			});
+		}
+
+		drawAllLayers() {
+			this.allLayers.ctx.clearRect(0, 0, this.allLayers.canvas.width, this.allLayers.canvas.height);
+			this.layers.forEach(({canvas}) => this.allLayers.ctx.drawImage(canvas, 0, 0));
+		}
+
+		addListener(listener) {
+			this.listeners.push(listener);
+		}
+
+		addBeginCurveListener(listener) {
+			this.beginCurveListeners.push(listener);
+		}
+
+		notifyListeners() {
+			this.drawAllLayers();
+			this.listeners.forEach(listener => listener());
+		}
+
+		notifyBeginCurveListeners() {
+			this.beginCurveListeners.forEach(listener => listener());
+		}
+
+		getLayerCanvas(layerI) {
+			return this.layers[layerI].canvas;
+		}
+
+		getAllLayersCanvas() {
+			return this.allLayers.canvas;
+		}
+
+		getHistoryLengths(layer) {
+			return [this.layers[layer].curves.length, this.layers[layer].undoStash.length];
+		}
+
+		saveLayers() {
+			return this.layers.map(layer => layer.curves);
+		}
+
+		loadLayers(data) {
+			data.forEach((layerCurves, i) => {
+				this.layers[i].curves = layerCurves;
+				this.redrawLayer(i);
+			});
+			this.notifyListeners();
+		}
+	}
+
+	class Average {
+		constructor(newWeight) {
+			this.newWeight = newWeight;
+		}
+
+		reset() {
+			this.value = null;
+		}
+
+		addValue(value) {
+			this.value = (this.value || value) * (1 - this.newWeight) + value * this.newWeight;
+			return this.value;
+		}
+	}
+
+	class CanvasPanel {
+		constructor(parentCanvas, x, y, width, height) {
+			this.canvas = document.createElement('canvas');
+			this.x = x;
+			this.y = y;
+			this.width = width;
+			this.height = height;
+			this.geometryInit();
+			this.canvas.width = this.width;
+			this.canvas.height = this.height;
+			this.ctx = this.canvas.getContext('2d');
+
+			this.addTouchListeners(parentCanvas);
+			this.addMouseListeners(parentCanvas);
+
+			this.init();
+		}
+
+		addTouchListeners(parentCanvas) {
+			this.touch = false;
+
+			parentCanvas.addEventListener('touchstart', e => {
+				this.touch = this.readTouch(e);
+				if (this.touch)
+					this.touchStart(this.touch);
+			});
+
+			parentCanvas.addEventListener('touchmove', e => {
+				if (!this.touch)
+					return;
+
+				this.touch = this.readTouch(e);
+				if (this.touch)
+					this.touchMove(this.touch);
+				else
+					this.touchEnd();
+			});
+
+			parentCanvas.addEventListener('touchend', e => {
+				if (this.touch)
+					this.touchEnd();
+				this.touch = null;
+			});
+		}
+
+		addMouseListeners(parentCanvas) {
+			this.mouseDown = false;
+
+			parentCanvas.addEventListener('mousedown', e => {
+				this.mouseDown = this.readMouse(e);
+				if (this.mouseDown)
+					this.touchStart(this.mouseDown);
+			});
+
+			parentCanvas.addEventListener('mousemove', e => {
+				if (!this.mouseDown)
+					return;
+
+				this.mouseDown = this.readMouse(e);
+				if (this.mouseDown)
+					this.touchMove(this.mouseDown);
+				else
+					this.touchEnd();
+			});
+
+			parentCanvas.addEventListener('mouseup', e => {
+				if (this.mouseDown)
+					this.touchEnd();
+				this.mouseDown = null;
+			});
+		}
+
+		geometryInit() {
+			// override
+		}
+
+		init() {
+			// override
+		}
+
+		readTouch(e) {
+			e.preventDefault();
+			let {clientX: x, clientY: y, radiusX: w, radiusY: h} = e.touches[0];
+			x -= this.x + e.srcElement.offsetLeft;
+			y -= this.y + e.srcElement.offsetTop;
+			if (x > 0 && x < this.width && y > 0 && y < this.height)
+				return {x, y, w, h};
+		}
+
+		readMouse(e) {
+			e.preventDefault();
+			let {clientX: x, clientY: y, altKey, ctrlKey, shiftKey} = e;
+			x -= this.x + e.srcElement.offsetLeft;
+			y -= this.y + e.srcElement.offsetTop;
+			let fakeSize = 2 + (altKey + ctrlKey + shiftKey) / 3;
+			if (x > 0 && x < this.width && y > 0 && y < this.height)
+				return {x, y, w: fakeSize, h: 0};
+		}
+
+		touchStart(touch) {
+			// override
+		}
+
+		touchMove(touch) {
+			// override
+		}
+
+		touchEnd() {
+			// override
+		}
+
+		draw(ctx) {
+			ctx.drawImage(this.canvas, this.x, this.y);
+		}
+
+		addOutline(outlinePath) {
+			let x = this.x || 1;
+			let y = this.y || 1;
+			let w = this.width - !this.x - (this.x + this.width === canvas.width);
+			let h = this.height - !this.y - (this.y + this.height === canvas.height);
+			outlinePath.rect(x, y, w, h);
+		}
+	}
+
+	class DrawPanel extends CanvasPanel {
+		init() {
+			curves.addListener(() => this.paint());
+		}
+
+		lastTouches(n) {
+			return this.touches.slice(this.touches.length - n);
+		}
+
+		touchStart(touch) {
+			curves.beginCurve();
+			curves.continueCurve(touch);
+		}
+
+		touchMove(touch) {
+			curves.continueCurve(touch);
+		}
+
+		touchEnd() {
+			curves.endCurve();
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			this.ctx.drawImage(curves.getAllLayersCanvas(), 0, 0);
+		}
+	}
+
+	class ColorPanel extends CanvasPanel {
+		static recentColorColumns = 4;
+		static recentColorRows = 4;
+
+		geometryInit() {
+			this.margin = 10;
+			this.size = this.width - this.margin * 2;
+
+			this.barHeight = 40;
+			this.brightnessBarTop = this.size + this.margin * 2;
+			this.alphaBarTop = this.brightnessBarTop + this.barHeight + this.margin;
+
+			this.largeSquareTop = this.alphaBarTop + this.barHeight + this.margin;
+			this.largeSquareSize = (this.size - this.margin) / 2;
+
+			this.recentColorTop = this.largeSquareTop + this.largeSquareSize + this.margin;
+			this.recentColorSize = (this.size - this.margin * (ColorPanel.recentColorColumns - 1)) / ColorPanel.recentColorColumns;
+
+			this.height = this.recentColorTop + (this.recentColorSize + this.margin) * ColorPanel.recentColorRows;
+		}
+
+		init() {
+			this.rx = Math.cos(0) + .5;
+			this.ry = Math.sin(0) + .5;
+			this.gx = Math.cos(Math.PI * 2 / 3) + .5;
+			this.gy = Math.sin(Math.PI * 2 / 3) + .5;
+			this.bx = Math.cos(Math.PI * 4 / 3) + .5;
+			this.by = Math.sin(Math.PI * 4 / 3) + .5;
+
+			this.brightness = .5;
+			this.alpha = 1;
+			this.circleX = this.circleY = .5;
+			this.setColor();
+			this.eraser = false;
+
+			this.recentColors = [];
+			for (let i = 0; i < ColorPanel.recentColorColumns * ColorPanel.recentColorRows; i++)
+				this.recentColors.push(this.currentColorObj);
+
+			this.paint();
+
+			curves.addBeginCurveListener(() => this.checkAddingRecentColor());
+		}
+
+		get currentColorObj() {
+			return {circleX: this.circleX, circleY: this.circleY, brightness: this.brightness, alpha: this.alpha};
+		}
+
+		touchStart(touch) {
+			this.pick(touch.x, touch.y);
+			this.paint();
+		}
+
+		touchMove(touch) {
+			this.pick(touch.x, touch.y);
+			this.paint();
+
+		}
+
+		checkAddingRecentColor() {
+			let currentColor = this.currentColorObj;
+			let index = this.recentColors.findIndex(color => Object.entries(currentColor).every(([key, value]) => value === color[key]));
+			this.recentColors.splice(index, 1);
+			this.recentColors.unshift(currentColor);
+			this.paint()
+		}
+
+		colorAt(xf = this.circleX, yf = this.circleY, brightness = this.brightness, alpha = this.alpha) {
+			if (dist(xf, yf, .5, .5) > .5)
+				return;
+
+			let r = 1 + brightness - dist(xf, yf, this.rx, this.ry);
+			let g = 1 + brightness - dist(xf, yf, this.gx, this.gy);
+			let b = 1 + brightness - dist(xf, yf, this.bx, this.by);
+			return {r, g, b, a: alpha};
+		}
+
+		setColor() {
+			this.color = this.colorAt() || this.color;
+			curves.setColor(this.eraser ? {eraser: true} : this.color);
+		}
+
+		pick(x, y) {
+			this.pickColor(x, y);
+			this.pickBrightness(x, y);
+			this.pickAlpha(x, y);
+			this.pickEraser(x, y);
+			this.pickRecentColor(x, y);
+			this.setColor();
+		}
+
+		pickColor(x, y) {
+			let xf = (x - this.margin) / this.size;
+			let yf = (y - this.margin) / this.size;
+			if (this.colorAt(xf, yf)) {
+				this.circleX = xf;
+				this.circleY = yf;
+			}
+		}
+
+		pickBrightness(x, y) {
+			let xf = (x - this.margin) / this.size;
+			let yf = (y - this.brightnessBarTop) / this.barHeight;
+
+			if (xf > 0 && xf < 1 && yf > 0 && yf < 1)
+				this.brightness = xf;
+		}
+
+		pickAlpha(x, y) {
+			let xf = (x - this.margin) / this.size;
+			let yf = (y - this.alphaBarTop) / this.barHeight;
+
+			if (xf > 0 && xf < 1 && yf > 0 && yf < 1)
+				this.alpha = xf;
+		}
+
+		pickEraser(x, y) {
+			let deltaX = this.largeSquareSize + this.margin;
+			let xf = (x - this.margin) / deltaX;
+			let yf = (y - this.largeSquareTop) / this.largeSquareSize;
+
+			if (xf > 0 && xf % 1 < this.largeSquareSize / deltaX && xf < 2 && yf > 0 && yf < 1)
+				this.eraser = xf - xf % 1;
+		}
+
+		pickRecentColor(x, y) {
+			let deltaXY = this.recentColorSize + this.margin;
+			let xf = (x - this.margin) / deltaXY;
+			let yf = (y - this.recentColorTop) / deltaXY;
+
+			if (xf > 0 && xf % 1 < this.recentColorSize / deltaXY && xf < ColorPanel.recentColorColumns &&
+				yf > 0 && yf % 1 < this.recentColorSize / deltaXY && yf < ColorPanel.recentColorRows) {
+				let x = xf - xf % 1;
+				let y = yf - yf % 1;
+				let i = y * ColorPanel.recentColorColumns + x;
+				({circleX: this.circleX, circleY: this.circleY, brightness: this.brightness, alpha: this.alpha} = this.recentColors[i]);
+			}
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			this.paintColor();
+			this.paintBrightness();
+			this.paintAlpha();
+			this.paintPreview();
+			this.paintEraser();
+			this.paintRecentColor();
+		}
+
+		paintColor() {
+			for (let x = 0; x < this.size; x++)
+				for (let y = 0; y < this.size; y++) {
+					let xf = x / this.size, yf = y / this.size;
+					let c = this.colorAt(xf, yf);
+					if (!c)
+						continue;
+					let selected = Math.abs(xf - this.circleX) < .02 && Math.abs(yf - this.circleY) < .02;
+					this.ctx.fillStyle = selected ? cfu(1) : cf(c);
+					this.ctx.fillRect(x + this.margin, y + this.margin, 1, 1);
+				}
+
+			this.ctx.lineWidth = 1;
+			this.ctx.strokeStyle = cfu(.5);
+			this.ctx.beginPath();
+			let r = this.size / 2;
+			this.ctx.arc(r + this.margin, r + this.margin, r, r, 0, Math.PI * 2);
+			this.ctx.stroke();
+		}
+
+		paintBrightness() {
+			for (let x = 0; x < this.size; x++) {
+				let xf = x / this.size;
+
+				this.ctx.fillStyle = cfu(xf);
+				this.ctx.fillRect(x + this.margin, this.brightnessBarTop, 1, this.barHeight);
+			}
+
+			this.paintBarSelectionAndOutline(this.brightnessBarTop, this.brightness);
+		}
+
+		paintAlpha() {
+			this.paintCheckBackground(this.margin, this.alphaBarTop, this.size, this.barHeight);
+
+			for (let x = 0; x < this.size; x++) {
+				let xf = x / this.size;
+
+				this.ctx.fillStyle = cfu(0, xf);
+				this.ctx.fillRect(x + this.margin, this.alphaBarTop, 1, this.barHeight);
+			}
+
+			this.paintBarSelectionAndOutline(this.alphaBarTop, this.alpha);
+		}
+
+		paintPreview() {
+			let left = this.margin;
+
+			this.paintCheckBackground(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
+
+			this.ctx.fillStyle = cf(this.color);
+			this.ctx.fillRect(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
+
+			this.ctx.strokeStyle = cfu(!this.eraser ? 0 : .5);
+			this.ctx.lineWidth = !this.eraser ? 3 : 1;
+			this.ctx.strokeRect(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
+		}
+
+		paintEraser() {
+			let left = this.largeSquareSize + this.margin * 2;
+
+			this.paintCheckBackground(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
+
+			this.ctx.strokeStyle = cfu(this.eraser ? 0 : .5);
+			this.ctx.lineWidth = this.eraser ? 3 : 1;
+			this.ctx.strokeRect(left, this.largeSquareTop, this.largeSquareSize, this.largeSquareSize);
+		}
+
+		paintRecentColor() {
+			this.ctx.strokeStyle = cfu(0);
+			this.ctx.lineWidth = 1;
+
+			let deltaXY = this.recentColorSize + this.margin;
+			for (let x = 0; x < ColorPanel.recentColorColumns; x++)
+				for (let y = 0; y < ColorPanel.recentColorRows; y++) {
+					let rect = [x * deltaXY + this.margin, y * deltaXY + this.recentColorTop, this.recentColorSize, this.recentColorSize];
+					this.paintCheckBackground(...rect);
+					let color = this.recentColors[y * ColorPanel.recentColorColumns + x];
+					this.ctx.fillStyle = cf(this.colorAt(color.circleX, color.circleY, color.brightness, color.alpha));
+					this.ctx.fillRect(...rect);
+					this.ctx.strokeRect(...rect);
+				}
+		}
+
+		paintBarSelectionAndOutline(barTop, selection) {
+			let selectionLeft = Math.max(selection - .02, 0);
+			let selectionWidth = Math.min(selection + .02, 1) - selectionLeft;
+			this.ctx.fillStyle = cfu(1);
+			this.ctx.fillRect(selectionLeft * this.size + this.margin, barTop, selectionWidth * this.size, this.barHeight);
+			this.ctx.strokeStyle = cfu(.5);
+			this.ctx.lineWidth = 1;
+			this.ctx.strokeRect(selectionLeft * this.size + this.margin, barTop, selectionWidth * this.size, this.barHeight);
+
+			this.ctx.strokeRect(this.margin, barTop, this.size, this.barHeight);
+		}
+
+		paintCheckBackground(left, top, width, height) {
+			const square = 10;
+			for (let x = 0; x < width / square; x++)
+				for (let y = 0; y < height / square; y++) {
+					let black = (x + y) % 2;
+					this.ctx.fillStyle = black ? cfu(0) : cfu(1);
+					let w = Math.min(square, width - x * square);
+					let h = Math.min(square, height - y * square);
+					this.ctx.fillRect(x * square + left, y * square + top, w, h);
+				}
+		}
+	}
+
+	class WidthPanel extends CanvasPanel {
+		geometryInit() {
+			this.margin = 10;
+			this.size = this.width - this.margin * 2;
+			this.barHeight = 40;
+			this.height = this.barHeight + this.margin * 2;
+		}
+
+		init() {
+			this.selectedMin = 0;
+			this.selectedMax = 1;
+
+			this.touchEnd();
+			this.paint();
+		}
+
+		touchStart(touch) {
+			let xf = this.pick(touch.x, touch.y);
+			if (!xf)
+				return;
+			this.selectedDown = this.selectedMin = this.selectedMax = xf;
+			this.paint();
+
+		}
+
+		touchMove(touch) {
+			let xf = this.pick(touch.x, touch.y);
+			if (!xf || !this.selectedDown)
+				return;
+			this.selectedMin = Math.min(this.selectedDown, xf);
+			this.selectedMax = Math.max(this.selectedDown, xf);
+			this.paint();
+		}
+
+		touchEnd() {
+			this.selectedDown = null;
+			curves.setBrushWidth({min: this.selectedMin, max: this.selectedMax});
+		}
+
+		pick(x, y) {
+			let xf = (x - this.margin) / this.size;
+			let yf = (y - this.margin) / this.barHeight;
+			if (xf > 0 && xf < 1 && yf > 0 && yf < 1)
+				return xf;
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+
+			let middleY = this.margin + this.barHeight / 2;
+			if (!this.outlinePath) {
+				this.outlinePath = new Path2D();
+				this.outlinePath.moveTo(this.margin, middleY);
+				this.outlinePath.lineTo(this.margin + this.size, middleY - this.barHeight / 2);
+				this.outlinePath.lineTo(this.margin + this.size, middleY + this.barHeight / 2);
+				this.outlinePath.closePath();
+			}
+
+			let selected = new Path2D();
+			selected.moveTo(this.margin + this.selectedMin * this.size, middleY - this.selectedMin * this.barHeight / 2);
+			selected.lineTo(this.margin + this.selectedMin * this.size, middleY + this.selectedMin * this.barHeight / 2);
+			selected.lineTo(this.margin + this.selectedMax * this.size + 1, middleY + this.selectedMax * this.barHeight / 2);
+			selected.lineTo(this.margin + this.selectedMax * this.size + 1, middleY - this.selectedMax * this.barHeight / 2);
+
+			this.ctx.fillStyle = cfu(0);
+			this.ctx.fill(this.outlinePath);
+			this.ctx.fillStyle = cfu(1);
+			this.ctx.fill(selected);
+			this.ctx.stroke(this.outlinePath);
+		}
+	}
+
+	class LayerPanel extends CanvasPanel {
+		geometryInit() {
+			this.margin = 10;
+			this.barWidth = this.width - this.margin * 2;
+			this.barHeight = this.barWidth;
+			this.deltaY = this.barHeight + this.margin;
+		}
+
+		init() {
+			this.layerCount = LAYER_COUNT;
+			this.setLayer(0);
+			this.paint();
+
+			curves.addListener(() => this.paint());
+		}
+
+		setLayer(layer) {
+			this.layer = layer;
+			curves.setLayer(layer);
+		}
+
+		touchStart(touch) {
+			this.pick(touch.x, touch.y);
+			this.paint();
+
+		}
+
+		pick(x, y) {
+			let xf = (x - this.margin) / this.barWidth;
+			let yf = (y - this.margin) / this.deltaY;
+			if (xf > 0 && xf < 1 && yf > 0 && yf % 1 < this.barHeight / this.deltaY && yf < this.layerCount)
+				this.setLayer(yf - yf % 1);
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			for (let i = 0; i < this.layerCount; i++) {
+				if (i === this.layer)
+					this.ctx.strokeStyle = cfu(0);
+				else
+					this.ctx.strokeStyle = cfu(.6);
+				this.ctx.drawImage(curves.getLayerCanvas(i), this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
+				this.ctx.strokeRect(this.margin, i * this.deltaY + this.margin, this.barWidth, this.barHeight);
+			}
+		}
+	}
+
+	class HistoryPanel extends CanvasPanel {
+		geometryInit() {
+			// todo share with layer panel
+			this.margin = 10;
+			this.barWidth = this.width - this.margin * 2;
+			this.barHeight = this.barWidth;
+			this.deltaY = this.barHeight + this.margin;
+		}
+
+		init() {
+			this.layerCount = LAYER_COUNT;
+			this.paint();
+
+			curves.addListener(() => this.paint());
+		}
+
+		touchStart(touch) {
+			this.pick(touch.x, touch.y);
+			this.paint();
+		}
+
+		pick(x, y) {
+			let xf = (x - this.margin) / this.barWidth;
+			let yf = (y - this.margin) / this.deltaY;
+			if (xf > 0 && xf < 1 && yf > 0 && yf % 1 < this.barHeight / this.deltaY && yf < this.layerCount)
+				curves.undo(yf - yf % 1, yf % 1 < .5);
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			this.ctx.fillStyle = cfu(.4);
+			this.ctx.font = '15px Arial';
+			this.ctx.textBaseline = 'top';
+
+			for (let i = .0; i < this.layerCount; i++) {
+				let topTextY = i * this.deltaY - fontHeight(this.ctx) / 2 + this.margin + this.barHeight / 4;
+				let [undoLength, redoLength] = curves.getHistoryLengths(i);
+				this.ctx.fillText('< ' + undoLength, this.margin, topTextY);
+				this.ctx.fillText('> ' + redoLength, this.margin, topTextY + this.barHeight / 2);
+			}
+		}
+	}
+
+	class ExportPanel extends CanvasPanel {
+		geometryInit() {
+			this.margin = 10;
+			this.size = this.width - this.margin * 2;
+			this.height = font15Height * 3 + this.margin * 7;
+		}
+
+		init() {
+			this.ctx.font = '15px Arial';
+			this.ctx.textBaseline = 'top';
+			this.buttonHeight = fontHeight(this.ctx) + this.margin;
+			this.deltaY = this.buttonHeight + this.margin;
+
+			this.buttons = [
+				{text: 'PNG', handler: ExportPanel.pngHandler},
+				{text: 'SAVE', handler: ExportPanel.saveHandler},
+				{text: 'LOAD', handler: ExportPanel.loadHandler},
+			];
+
+			this.paint();
+		}
+
+		touchStart(touch) {
+			let xf = (touch.x - this.margin) / this.size;
+			let yf = (touch.y - this.margin) / this.deltaY;
+			if (xf > 0 && xf < 1 && yf > 0 && yf % 1 < this.buttonHeight / this.deltaY && yf < this.buttons.length)
+				this.buttons[yf - yf % 1].handler();
+		}
+
+		static pngHandler() {
+			curves.getAllLayersCanvas().toBlob(blob => {
+				let a = document.createElement('a');
+				a.href = URL.createObjectURL(blob);
+				a.download = 'touchPaintExport.png';
+				a.click();
+			});
+		}
+
+		static saveHandler() {
+			let blob = new Blob([JSON.stringify(curves.saveLayers(), null, 2)], {type: 'application/json'});
+			let a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = 'touchPaintExport.json';
+			a.click();
+		}
+
+		static loadHandler() {
+			let input = document.createElement('input');
+			input.type = 'file';
+			input.accept = 'application/json';
+			input.click();
+			input.addEventListener('change', () => {
+				let fileReader = new FileReader();
+				fileReader.readAsText(input.files[0]);
+				fileReader.addEventListener('load', () => {
+					let data;
+					try {
+						data = JSON.parse(fileReader.result);
+					} catch {
+						console.error('unable to read');
+					}
+					curves.loadLayers(data);
+				})
+			});
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			this.buttons.forEach(({text}, i) => this.paintButton(text, i));
+		}
+
+		paintButton(text, row) {
+			let top = row * this.deltaY + this.margin;
+			this.ctx.fillText(text, this.margin * 1.5, top + this.margin / 2);
+			this.ctx.strokeRect(this.margin, top, this.size, this.buttonHeight);
+		}
+	}
+
+	const canvas = $('canvas');
+	const ctx = canvas.getContext('2d');
+
+	let curves = new Curves(800, 800);
+
+	let tempPanel, exportPanel;
+	let panels = [
+		tempPanel = new ColorPanel(canvas, 0, 0, 200),
+		new WidthPanel(canvas, 0, tempPanel.y + tempPanel.height, 200),
+		exportPanel = new ExportPanel(canvas, 0, 0, 200),
+		new DrawPanel(canvas, 200, 0, 800, 800),
+		new LayerPanel(canvas, 1000, 0, 100, 800),
+		new HistoryPanel(canvas, 1100, 0, 100, 800),
+	];
+	exportPanel.y = 800 - exportPanel.height;
+
+	let outline = new Path2D();
+	panels.forEach(panel => panel.addOutline(outline));
+	outline.rect(1, 1, canvas.width - 2, canvas.height - 2);
+
+	let render = () => {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		panels.forEach(panel => panel.draw(ctx));
+		ctx.strokeStyle = cfu(.6);
+		ctx.stroke(outline);
+		requestAnimationFrame(render);
+	};
+	render();
+
+	// todo
+	// brush style
+	// more accuracy and drag movement with key modifiers
+	// zoom
+	// tools such as move, copy, rotate
+	// dim layers on top of selected layer
+	// way to reset inputs
+	// gradiantly more accurate inputs; e.g., brightness bar will have second row with delta fro selected brightnesss, and further rows with more precise but less range.
+	// keyboard shortcuts
+</script>
