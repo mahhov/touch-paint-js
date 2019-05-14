@@ -7,6 +7,7 @@
 	const dist = (x, y, x2, y2) => Math.sqrt((x - x2) ** 2 + (y - y2) ** 2);
 	const scale = (v, min, max) => Math.min(Math.max((v - min) / (max - min), 0), 1);
 	const fontHeight = ctx => ctx.measureText('M').width * .99;
+	const font15Height = 13; // todo more precise
 
 	const LAYER_COUNT = 5;
 
@@ -779,19 +780,13 @@
 	}
 
 	class ExportPanel extends CanvasPanel {
-		static getHeight() {
-			// hardcoded because we can't calculate actual height before we create the context
-			return 108;
-		}
-
 		geometryInit() {
 			this.margin = 10;
 			this.size = this.width - this.margin * 2;
-			this.height = ExportPanel.getHeight();
+			this.height = font15Height * 3 + this.margin * 7;
 		}
 
 		init() {
-			this.ctx.fillStyle = cfu(.4);
 			this.ctx.font = '15px Arial';
 			this.ctx.textBaseline = 'top';
 			this.buttonHeight = fontHeight(this.ctx) + this.margin;
@@ -867,15 +862,16 @@
 
 	let curves = new Curves(800, 800);
 
-	let tempPanel;
+	let tempPanel, exportPanel;
 	let panels = [
 		tempPanel = new ColorPanel(canvas, 0, 0, 200),
 		new WidthPanel(canvas, 0, tempPanel.y + tempPanel.height, 200),
-		new ExportPanel(canvas, 0, 800 - ExportPanel.getHeight(), 200),
+		exportPanel = new ExportPanel(canvas, 0, 0, 200),
 		new DrawPanel(canvas, 200, 0, 800, 800),
 		new LayerPanel(canvas, 1000, 0, 100, 800),
 		new HistoryPanel(canvas, 1100, 0, 100, 800),
 	];
+	exportPanel.y = 800 - exportPanel.height;
 
 	let outline = new Path2D();
 	panels.forEach(panel => panel.addOutline(outline));
