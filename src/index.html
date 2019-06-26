@@ -290,7 +290,10 @@
 
 		readTouch(e) {
 			e.preventDefault();
-			let {clientX: x, clientY: y, radiusX: w, radiusY: h} = e.touches[0];
+			let {clientX: x, clientY: y, radiusX: w, radiusY: h, force: f} = e.touches[0];
+			if (f !== .5) {
+				w = h = f * 3
+			}
 			x -= this.x + e.srcElement.offsetLeft;
 			y -= this.y + e.srcElement.offsetTop;
 			if (x > 0 && x < this.width && y > 0 && y < this.height)
@@ -689,6 +692,31 @@
 		}
 	}
 
+	class ToolPanel extends CanvasPanel {
+		geometryInit() {
+			this.margin = 10;
+			this.height = font15Height + this.margin * 3;
+			this.size = this.height - this.margin * 2;
+		}
+
+		init() {
+			this.ctx.font = '15px Arial';
+			this.ctx.textBaseline = 'top';
+			this.buttons = [
+				{text: 'M', handler: () => console.log('magnify clicked')},
+			];
+			this.paint();
+		}
+
+		paint() {
+			this.ctx.clearRect(0, 0, this.width, this.height);
+			this.buttons.forEach(({text}, i) => {
+				this.ctx.fillText(text, this.margin * 1.5, this.margin * 1.5);
+				this.ctx.strokeRect(this.margin, this.margin, this.size, this.size);
+			});
+		}
+	}
+
 	class LayerPanel extends CanvasPanel {
 		geometryInit() {
 			this.margin = 10;
@@ -864,7 +892,8 @@
 
 	let tempPanel, exportPanel;
 	let panels = [
-		tempPanel = new ColorPanel(canvas, 0, 0, 200),
+		tempPanel = new ToolPanel(canvas, 0, 0, 200, 50),
+		tempPanel = new ColorPanel(canvas, 0, tempPanel.y + tempPanel.height, 200),
 		new WidthPanel(canvas, 0, tempPanel.y + tempPanel.height, 200),
 		exportPanel = new ExportPanel(canvas, 0, 0, 200),
 		new DrawPanel(canvas, 200, 0, 800, 800),
